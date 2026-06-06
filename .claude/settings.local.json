@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -I https://intelligence.adventuresincre.com/mcp/k/acre_36016372ffc0db2b2cdc434f13c5818f64cedbc68be6cbe3)",
+      "Bash(curl -I https://intelligence.adventuresincre.com/mcp/k/acre_36016372ffc0db2b2cdc434f13c5818f64cedbc68be6cbe3/sse)",
+      "Bash(curl -I https://intelligence.adventuresincre.com/mcp/k/acre_36016372ffc0db2b2cdc434f13c5818f64cedbc68be6cbe3/mcp)"
+    ]
+  }
+}
