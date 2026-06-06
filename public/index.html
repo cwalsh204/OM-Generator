@@ -2234,7 +2234,7 @@ function renderOM() {
       const baseNarr = ei.macroNarrative || o.marketMacroBackdrop || '';
       const narr = baseNarr.length > 20
         ? baseNarr
-        : \`With the <b>10Y UST at \${t10v.toFixed(2)}%</b> and Freddie agency debt pricing near <b>\${fmfv.toFixed(2)}%</b>, borrowing costs \${spreadBps > 160 ? 'remain elevated' : 'are holding steady'} against the current inflation backdrop. \${ei.creditConditionsLabel ? ei.creditConditionsLabel + ' credit conditions support' : 'Agency credit supports'} stabilized asset execution.\`;
+        : `With the <b>10Y UST at ${t10v.toFixed(2)}%</b> and Freddie agency debt pricing near <b>${fmfv.toFixed(2)}%</b>, borrowing costs ${spreadBps > 160 ? 'remain elevated' : 'are holding steady'} against the current inflation backdrop. ${ei.creditConditionsLabel ? ei.creditConditionsLabel + ' credit conditions support' : 'Agency credit supports'} stabilized asset execution.`;
 
       // ── Rate sheet table rows ──
       // Build from A.CRE rateSheet.rows if available; fall back to a single subject row
