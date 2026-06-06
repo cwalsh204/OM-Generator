@@ -1130,9 +1130,9 @@ app.get("/api/map-image", (req, res) => {
 });
 
 // ─── START ────────────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`OM Generator v2.2 running on port ${PORT}`);
-  console.log(`Anthropic API key: ${!!process.env.ANTHROPIC_API_KEY}`);
-  console.log(`Architecture: A.CRE via Claude MCP → web search fallbacks → pure JSON generation`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = app;
