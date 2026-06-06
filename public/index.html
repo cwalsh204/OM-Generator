@@ -2247,34 +2247,34 @@ function renderOM() {
         return '<span class="rs-conf"><span class="rs-dot low"></span><span class="rs-dot"></span><span class="rs-dot"></span></span>';
       };
       const _rateRange = (lo, hi) => lo != null && hi != null && Math.abs(hi - lo) > 0.01
-        ? \`\${Number(lo).toFixed(2)}–\${Number(hi).toFixed(2)}%\`
-        : lo != null ? \`\${Number(lo).toFixed(2)}%\` : '—';
+        ? `${Number(lo).toFixed(2)}–${Number(hi).toFixed(2)}%`
+        : lo != null ? `${Number(lo).toFixed(2)}%` : '—';
 
       const _tableRows = _rsRows
         ? _rsRows.map(r => {
             const isSubject = (r.ltvBucket||'').includes('65') && (r.term||'').toLowerCase().includes('10');
-            return \`<tr\${isSubject ? ' class="rs-row-subject"' : ''}>
-              <td><span class="rs-term">\${esc(r.term||'')}</span>\${esc(r.ltvBucket||'')}\${isSubject ? '<span class="rs-subject-tag">Subject</span>' : ''}</td>
-              <td><span class="rs-rate">\${_rateRange(r.rateRangeLow, r.rateRangeHigh)}</span></td>
-              <td class="rs-spread">\${r.spreadBps != null ? r.spreadBps + ' bps' : '—'}</td>
-              <td>\${r.sampleLoans != null ? r.sampleLoans + ' loans' : '—'}</td>
-              <td>\${_confDots(r.confidence)}</td>
-            </tr>\`;
+            return `<tr${isSubject ? ' class="rs-row-subject"' : ''}>
+              <td><span class="rs-term">${esc(r.term||'')}</span>${esc(r.ltvBucket||'')}${isSubject ? '<span class="rs-subject-tag">Subject</span>' : ''}</td>
+              <td><span class="rs-rate">${_rateRange(r.rateRangeLow, r.rateRangeHigh)}</span></td>
+              <td class="rs-spread">${r.spreadBps != null ? r.spreadBps + ' bps' : '—'}</td>
+              <td>${r.sampleLoans != null ? r.sampleLoans + ' loans' : '—'}</td>
+              <td>${_confDots(r.confidence)}</td>
+            </tr>`;
           }).join('')
-        : \`<tr class="rs-row-subject">
-            <td><span class="rs-term">10-Year</span>\${esc(_subjectBucket)}<span class="rs-subject-tag">Subject</span></td>
-            <td><span class="rs-rate">\${fmfv.toFixed(2)}%</span></td>
-            <td class="rs-spread">\${spreadBps} bps</td>
+        : `<tr class="rs-row-subject">
+            <td><span class="rs-term">10-Year</span>${esc(_subjectBucket)}<span class="rs-subject-tag">Subject</span></td>
+            <td><span class="rs-rate">${fmfv.toFixed(2)}%</span></td>
+            <td class="rs-spread">${spreadBps} bps</td>
             <td>—</td>
-            <td>\${_confDots('low')}</td>
-          </tr>\`;
+            <td>${_confDots('low')}</td>
+          </tr>`;
 
       // ── Subject quote card values ──
       const _subjectRow = _rsRows ? _rsRows.find(r => (r.ltvBucket||'').includes('65') && (r.term||'').toLowerCase().includes('10')) : null;
-      const _quoteRate  = _subjectRow ? _rateRange(_subjectRow.rateRangeLow, _subjectRow.rateRangeHigh) : \`\${fmfv.toFixed(2)}%\`;
+      const _quoteRate  = _subjectRow ? _rateRange(_subjectRow.rateRangeLow, _subjectRow.rateRangeHigh) : `${fmfv.toFixed(2)}%`;
       const _quoteMeta  = _subjectRow
-        ? \`\${_subjectRow.spreadBps != null ? _subjectRow.spreadBps + ' bps wavg spread over 10Y UST' : ''}\${_subjectRow.sampleLoans ? ' · ' + _subjectRow.sampleLoans + ' loans' : ''} · \${(_subjectRow.confidence||'low')} confidence, indicative only.\`
-        : \`\${spreadBps} bps spread over 10Y UST · indicative only.\`;
+        ? `${_subjectRow.spreadBps != null ? _subjectRow.spreadBps + ' bps wavg spread over 10Y UST' : ''}${_subjectRow.sampleLoans ? ' · ' + _subjectRow.sampleLoans + ' loans' : ''} · ${(_subjectRow.confidence||'low')} confidence, indicative only.`
+        : `${spreadBps} bps spread over 10Y UST · indicative only.`;
 
       // ── Mini stats ──
       const delinq    = a.rates?.delinquencyRate != null ? Number(a.rates.delinquencyRate).toFixed(2) + '%' : '—';
@@ -2282,52 +2282,52 @@ function renderOM() {
       const creditLbl = ei.creditConditionsLabel || '—';
       const t5disp    = t5v != null ? t5v.toFixed(2) + '%' : '—';
 
-      return \`
+      return `
       <div class="a-hero">
         <div>
-          <div class="a-env-chip \${chipClass}">\${esc(envLabel)}</div>
-          <div class="a-hero-headline">\${esc(ei.macroHeadline || narr.replace(/<[^>]+>/g,'').slice(0,120))}</div>
+          <div class="a-env-chip ${chipClass}">${esc(envLabel)}</div>
+          <div class="a-hero-headline">${esc(ei.macroHeadline || narr.replace(/<[^>]+>/g,'').slice(0,120))}</div>
         </div>
         <div class="a-bench-rail">
           <div class="a-bench">
             <div class="a-bench-label">10Y UST</div>
-            <div class="a-bench-val">\${t10v.toFixed(2)}<span class="pct">%</span></div>
+            <div class="a-bench-val">${t10v.toFixed(2)}<span class="pct">%</span></div>
             <div class="a-bench-sub">CRE benchmark</div>
           </div>
           <div class="a-bench">
             <div class="a-bench-label">Freddie MF</div>
-            <div class="a-bench-val">\${fmfv.toFixed(2)}<span class="pct">%</span></div>
-            <div class="a-bench-sub">+\${spreadBps} bps spread</div>
+            <div class="a-bench-val">${fmfv.toFixed(2)}<span class="pct">%</span></div>
+            <div class="a-bench-sub">+${spreadBps} bps spread</div>
           </div>
           <div class="a-bench">
             <div class="a-bench-label">SOFR</div>
-            <div class="a-bench-val">\${sofrv.toFixed(2)}<span class="pct">%</span></div>
+            <div class="a-bench-val">${sofrv.toFixed(2)}<span class="pct">%</span></div>
             <div class="a-bench-sub">Floating bmk</div>
           </div>
         </div>
       </div>
 
       <div class="a-infl-band">
-        <div class="a-infl-narr">\${narr}</div>
+        <div class="a-infl-narr">${narr}</div>
         <div class="a-infl-points">
           <div class="a-infl-pt">
             <div class="a-infl-pt-label">CPI-U YoY</div>
-            <div class="a-infl-pt-val">\${cpiYoY != null ? cpiYoY + '<small>%</small>' + _arr(ei.cpiYoY) : '—'}</div>
-            <div class="a-infl-pt-sub">\${ei.cpiYoY != null ? (ei.cpiYoY > 3 ? 'Accelerating' : ei.cpiYoY < 2 ? 'Decelerating' : 'Near target') : 'Data pending'}</div>
+            <div class="a-infl-pt-val">${cpiYoY != null ? cpiYoY + '<small>%</small>' + _arr(ei.cpiYoY) : '—'}</div>
+            <div class="a-infl-pt-sub">${ei.cpiYoY != null ? (ei.cpiYoY > 3 ? 'Accelerating' : ei.cpiYoY < 2 ? 'Decelerating' : 'Near target') : 'Data pending'}</div>
           </div>
           <div class="a-infl-pt">
             <div class="a-infl-pt-label">Core CPI</div>
-            <div class="a-infl-pt-val">\${coreCPI != null ? coreCPI + '<small>%</small>' + _arr(ei.coreInflation) : '—'}</div>
-            <div class="a-infl-pt-sub">\${ei.coreInflation != null ? (ei.coreInflation > 3 ? 'Elevated' : 'Contained') : 'Data pending'}</div>
+            <div class="a-infl-pt-val">${coreCPI != null ? coreCPI + '<small>%</small>' + _arr(ei.coreInflation) : '—'}</div>
+            <div class="a-infl-pt-sub">${ei.coreInflation != null ? (ei.coreInflation > 3 ? 'Elevated' : 'Contained') : 'Data pending'}</div>
           </div>
           <div class="a-infl-pt">
             <div class="a-infl-pt-label">Shelter</div>
-            <div class="a-infl-pt-val">\${shelter != null ? shelter + '<small>%</small>' + _arr(ei.shelterInflation) : '—'}</div>
+            <div class="a-infl-pt-val">${shelter != null ? shelter + '<small>%</small>' + _arr(ei.shelterInflation) : '—'}</div>
             <div class="a-infl-pt-sub">Rent-relevant</div>
           </div>
           <div class="a-infl-pt">
             <div class="a-infl-pt-label">Constr. Cost</div>
-            <div class="a-infl-pt-val">\${constCost != null ? constCost + '<small>%</small>' + _arr(ei.constructionCostYoY) : '—'}</div>
+            <div class="a-infl-pt-val">${constCost != null ? constCost + '<small>%</small>' + _arr(ei.constructionCostYoY) : '—'}</div>
             <div class="a-infl-pt-sub">Supply-suppressive</div>
           </div>
         </div>
@@ -2335,34 +2335,34 @@ function renderOM() {
 
       <div class="a-body">
         <div class="a-matrix-pane">
-          <div class="a-pane-title">Agency Rate Sheet — Term &times; LTV <span class="acre-badge-light">\${anyRateFallback ? 'Estimated' : 'A.CRE Live'}</span></div>
-          <div class="a-pane-cap">\${esc(rs.rateSheetNarrative || 'Indicative all-in rates and weighted-average spreads over matching UST, derived from recent Freddie K-Deal and SB pool data.')}</div>
+          <div class="a-pane-title">Agency Rate Sheet — Term &times; LTV <span class="acre-badge-light">${anyRateFallback ? 'Estimated' : 'A.CRE Live'}</span></div>
+          <div class="a-pane-cap">${esc(rs.rateSheetNarrative || 'Indicative all-in rates and weighted-average spreads over matching UST, derived from recent Freddie K-Deal and SB pool data.')}</div>
           <table class="rs-table">
             <thead>
               <tr><th>Term &amp; LTV</th><th>Indicative Rate</th><th>WAvg Spread</th><th>Sample</th><th>Conf.</th></tr>
             </thead>
-            <tbody>\${_tableRows}</tbody>
+            <tbody>${_tableRows}</tbody>
           </table>
           <div class="rs-footnote">
-            <span>\${_confDots('high')} High confidence (n≥50)</span>
-            <span>\${_confDots('medium')} Medium confidence (n≥20)</span>
-            <span>\${_confDots('low')} Low confidence (n&lt;20)</span>
+            <span>${_confDots('high')} High confidence (n≥50)</span>
+            <span>${_confDots('medium')} Medium confidence (n≥20)</span>
+            <span>${_confDots('low')} Low confidence (n&lt;20)</span>
           </div>
         </div>
         <div class="a-side">
           <div class="a-quote-card">
-            <div class="a-quote-label">Subject Indicative — \${esc(_subjectBucket)}</div>
-            <div class="a-quote-rate">\${_quoteRate.replace('%','')}<small>%</small></div>
-            <div class="a-quote-meta">\${esc(_quoteMeta)}</div>
+            <div class="a-quote-label">Subject Indicative — ${esc(_subjectBucket)}</div>
+            <div class="a-quote-rate">${_quoteRate.replace('%','')}<small>%</small></div>
+            <div class="a-quote-meta">${esc(_quoteMeta)}</div>
           </div>
           <div class="a-mini-stats">
-            <div class="a-mini"><div class="a-mini-label">Agency MF delinquency</div><div class="a-mini-val\${a.rates?.delinquencyRate != null && a.rates.delinquencyRate < 3 ? ' pos' : ''}">\${delinq}</div></div>
-            <div class="a-mini"><div class="a-mini-label">CRE lending YoY</div><div class="a-mini-val\${ei.creLendingYoY != null ? (ei.creLendingYoY >= 0 ? ' pos' : ' neg') : ''}">\${cre_yoy}</div></div>
-            <div class="a-mini"><div class="a-mini-label">Credit conditions</div><div class="a-mini-val">\${esc(creditLbl)}</div></div>
-            <div class="a-mini"><div class="a-mini-label">5Y UST</div><div class="a-mini-val">\${t5disp}</div></div>
+            <div class="a-mini"><div class="a-mini-label">Agency MF delinquency</div><div class="a-mini-val${a.rates?.delinquencyRate != null && a.rates.delinquencyRate < 3 ? ' pos' : ''}">${delinq}</div></div>
+            <div class="a-mini"><div class="a-mini-label">CRE lending YoY</div><div class="a-mini-val${ei.creLendingYoY != null ? (ei.creLendingYoY >= 0 ? ' pos' : ' neg') : ''}">${cre_yoy}</div></div>
+            <div class="a-mini"><div class="a-mini-label">Credit conditions</div><div class="a-mini-val">${esc(creditLbl)}</div></div>
+            <div class="a-mini"><div class="a-mini-label">5Y UST</div><div class="a-mini-val">${t5disp}</div></div>
           </div>
         </div>
-      </div>\`;
+      </div>`;
     })()}
     ${secFooter('Section 08','Capital Markets & Macro')}
   </div>
