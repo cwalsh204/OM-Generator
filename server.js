@@ -7,6 +7,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const { Client: MCPClient } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+const path = require("path");
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -19,7 +20,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: "4mb" }));
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 // A.CRE Intelligence Hub data is fetched via Claude MCP
 // No separate API key needed — accessed through ANTHROPIC_API_KEY account connection
