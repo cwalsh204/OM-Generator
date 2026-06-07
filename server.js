@@ -8,6 +8,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const { Client: MCPClient } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 const path = require("path");
+const { Redis } = require('@upstash/redis');
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -25,15 +26,53 @@ app.use(express.static(path.join(__dirname, "public")));
 // A.CRE Intelligence Hub data is fetched via Claude MCP
 // No separate API key needed — accessed through ANTHROPIC_API_KEY account connection
 
-// ─── A.CRE DATA CACHE (30 min, keyed by address|city|state) ──────────────────
-let acreCache = {};
+// ─── UPSTASH REDIS CLIENT (persistent cache across serverless instances) ───────
+let redis = null;
+try {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redis = new Redis({
+      url:   process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    console.log('Upstash Redis client initialised');
+  } else {
+    console.log('Upstash env vars not set — Redis cache disabled');
+  }
+} catch (e) {
+  console.warn('Redis init failed — cache disabled:', e.message);
+}
+
+// ─── CACHE KEY NORMALISATION (city|state, lowercased and trimmed) ─────────────
+function normaliseCacheKey(city, state) {
+  const stateMap = {
+    'alabama':'al','alaska':'ak','arizona':'az','arkansas':'ar','california':'ca',
+    'colorado':'co','connecticut':'ct','delaware':'de','florida':'fl','georgia':'ga',
+    'hawaii':'hi','idaho':'id','illinois':'il','indiana':'in','iowa':'ia',
+    'kansas':'ks','kentucky':'ky','louisiana':'la','maine':'me','maryland':'md',
+    'massachusetts':'ma','michigan':'mi','minnesota':'mn','mississippi':'ms','missouri':'mo',
+    'montana':'mt','nebraska':'ne','nevada':'nv','new hampshire':'nh','new jersey':'nj',
+    'new mexico':'nm','new york':'ny','north carolina':'nc','north dakota':'nd','ohio':'oh',
+    'oklahoma':'ok','oregon':'or','pennsylvania':'pa','rhode island':'ri','south carolina':'sc',
+    'south dakota':'sd','tennessee':'tn','texas':'tx','utah':'ut','vermont':'vt',
+    'virginia':'va','washington':'wa','west virginia':'wv','wisconsin':'wi','wyoming':'wy',
+    'district of columbia':'dc','washington dc':'dc','washington d.c.':'dc'
+  };
+  const c = (city  || '').toLowerCase().trim().replace(/\s+/g,' ');
+  const s = (state || '').toLowerCase().trim().replace(/\./g,'');
+  const sNorm = stateMap[s] || s;
+  return `acre:${c}|${sNorm}`;
+}
+
+// ─── A.CRE DATA CACHE — fallback in-memory for local dev without Redis ────────
+let acreMemCache = {};
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     anthropicKey: !!process.env.ANTHROPIC_API_KEY,
-    acreCacheEntries: Object.keys(acreCache).length,
+    acreCacheEntries: Object.keys(acreMemCache).length,
+    redisConnected: !!redis,
     node: process.version
   });
 });
@@ -77,11 +116,24 @@ function anthropicCall(payload, includeWebSearch = false, betaHeader = null) {
 async function fetchAcreData(address, city, state, county, msa) {
   console.log(`Fetching A.CRE data via MCP SDK for: ${address}, ${city}, ${state}`);
 
-  const cacheKey = `${address}|${city}|${state}`;
+  const cacheKey = normaliseCacheKey(city, state);
   const today = new Date().toDateString();
-  if (acreCache[cacheKey] && acreCache[cacheKey].date === today) {
-    console.log(`Using cached A.CRE data for ${today}`);
-    return acreCache[cacheKey].data;
+
+  // ── Try Redis first, fall back to in-memory, fall back to live fetch ──
+  try {
+    if (redis) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`Redis cache hit for ${cacheKey}`);
+        return cached;
+      }
+      console.log(`Redis cache miss for ${cacheKey} — fetching live`);
+    } else if (acreMemCache[cacheKey] && acreMemCache[cacheKey].date === today) {
+      console.log(`In-memory cache hit for ${cacheKey}`);
+      return acreMemCache[cacheKey].data;
+    }
+  } catch (cacheErr) {
+    console.warn('Redis read failed — proceeding without cache:', cacheErr.message);
   }
 
   const acreMcpUrl = process.env.ACRE_MCP_URL;
@@ -185,7 +237,18 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
       const data = JSON.parse(jsonMatch[0]);
       console.log('A.CRE data fetched successfully via MCP SDK');
       console.log('Macro environment:', data.economicIndicators?.macroEnvironment);
-      acreCache[cacheKey] = { data, date: today };
+      // ── Write to Redis (24hr TTL) or fall back to in-memory ──
+      try {
+        if (redis) {
+          await redis.set(cacheKey, data, { ex: 86400 });
+          console.log(`Redis cache written for ${cacheKey} (24hr TTL)`);
+        } else {
+          acreMemCache[cacheKey] = { data, date: today };
+        }
+      } catch (writeErr) {
+        console.warn('Redis write failed — data not cached:', writeErr.message);
+        acreMemCache[cacheKey] = { data, date: today };
+      }
       return data;
     }
 
