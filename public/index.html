@@ -526,7 +526,7 @@
 
   /* Chart containers */
   .om-chart-wrap { position:relative; margin-top:14px; }
-  .om-chart-title { font-size:10px; text-transform:uppercase; letter-spacing:2px; color:var(--om-gray); margin-bottom:8px; }
+  .om-chart-title { font-size:10px; text-transform:uppercase; letter-spacing:2px; color:var(--om-gray); margin-bottom:8px; font-weight:700; }
 
   /* Separator */
   .om-divider { height:1px; background:var(--om-border); margin:16px 0; }
@@ -665,7 +665,7 @@
   .sp-logo-box { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#fff; border:1px solid var(--om-border); border-radius:8px; width:100%; height:148px; }
   .sp-logo-mono { font-family:'Cormorant Garamond',serif; font-weight:700; color:var(--om-navy); font-size:60px; line-height:0.9; }
   .sp-logo-word { font-size:8px; letter-spacing:3px; text-transform:uppercase; color:var(--om-gray); }
-  .sp-uploaded-logo { width:100%; height:148px; object-fit:contain; border-radius:8px; background:#fff; border:1px solid var(--om-border); padding:16px; box-sizing:border-box; }
+  .sp-uploaded-logo { width:100%; height:148px; object-fit:contain; border-radius:8px; background:#fff; border:1px solid var(--om-border); padding:4px; box-sizing:border-box; }
   .b-grid { flex:1; display:grid; grid-template-columns:268px 1fr; min-height:0; }
   .b-rail { background:var(--om-light-gray); border:1px solid var(--om-border); border-radius:8px; padding:22px 20px; display:flex; flex-direction:column; gap:14px; }
   .b-name { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:700; color:var(--om-navy); line-height:1.1; }
@@ -676,7 +676,7 @@
   .b-fact-val { font-size:13px; color:var(--om-navy); font-weight:600; line-height:1.3; }
   .b-main { padding:0 0 0 30px; display:flex; flex-direction:column; }
   .b-about { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--om-gold); font-weight:600; margin-bottom:10px; }
-  .b-main .om-prose { font-size:13px; line-height:1.7; color:#374151; }
+  .b-main .om-prose { font-size:15px; line-height:1.7; color:#374151; }
   .b-approach-wrap { margin-top:auto; padding-top:18px; }
   .b-approach-label { font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--om-navy); font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
   .b-approach-label::after { content:''; flex:1; height:1px; background:var(--om-border); }
@@ -1215,7 +1215,9 @@ function renderOM() {
         const hhiPct = dem.median_household_income?.national_percentile ?? null;
         const bach   = parseFloat(dem.bachelor_degree_or_higher?.value ?? '');
         const empBase = Number(a.employment?.qcew?.total_employment || 0);
-        const popG   = a.census?.demographics?.population_growth?.value ?? a.market?.populationGrowth10y ?? null;
+        const empLabel = esc(a.county || inputs.city || 'Submarket') + ' Area jobs';
+        const _popGRaw = a.census?.demographics?.population_growth?.value ?? a.market?.populationGrowth10y ?? null;
+        const popG   = _popGRaw != null ? (_popGRaw <= 1 && _popGRaw >= -1 ? _popGRaw * 100 : _popGRaw) : null;
         const spi    = a.permits?.supply_pressure_index?.current_score ?? null;
         const spiPct = a.permits?.supply_pressure_index?.national_percentile ?? null;
 
@@ -1225,9 +1227,9 @@ function renderOM() {
         if (!isNaN(bach))
           cells.push({ l:'College-Educated', v:`${bach.toFixed(1)}<small>%</small>`, s:'of population' });
         if (empBase > 0)
-          cells.push({ l:'Employment Base', v:fmtK(empBase), s:`${esc(inputs.city||'Submarket')} jobs` });
+          cells.push({ l:'Employment Base', v:fmtK(empBase), s:empLabel });
         if (popG != null)
-          cells.push({ l:'Population Growth', v:`${Number(popG)>0?'+':''}${(+popG).toFixed(1)}<small>%</small><span class="es-ev-up">▲</span>`, s:'11-yr growth' });
+          cells.push({ l:'Population Growth', v:`${popG>0?'+':''}${popG.toFixed(1)}<small>%</small>${popG>0?'<span class="es-ev-up">▲</span>':popG<0?'<span style="color:#c0392b;font-size:15px;vertical-align:middle;margin-left:1px;">▼</span>':''}`, s:'11-yr growth' });
         if (spi != null)
           cells.push({ l:'Supply Pressure', v:`${spi}`, s:spiPct != null ? `${Math.round(spiPct)}${ord(spiPct)} pctile · constrained` : 'constrained' });
 
@@ -2260,6 +2262,11 @@ function renderOM() {
       // Build from A.CRE rateSheet.rows if available; fall back to a single subject row
       const _rsRows = Array.isArray(rs.rows) && rs.rows.length > 0 ? rs.rows : null;
       const _subjectBucket = (a.rates?.termLTVBucket || '10yr/65%').replace('yr','-Year').replace('/',' ');
+      const _confFromLoans = (r) => {
+        const n = r?.sampleLoans;
+        if (n != null) { if (n > 30) return 'high'; if (n > 15) return 'medium'; return 'low'; }
+        return (r?.confidence || 'low').toLowerCase();
+      };
       const _confDots = (conf) => {
         const c = (conf||'').toLowerCase();
         if (c === 'high')   return '<span class="rs-conf"><span class="rs-dot hi"></span><span class="rs-dot hi"></span><span class="rs-dot hi"></span></span>';
@@ -2278,7 +2285,7 @@ function renderOM() {
               <td><span class="rs-rate">${_rateRange(r.rateRangeLow, r.rateRangeHigh)}</span></td>
               <td class="rs-spread">${r.spreadBps != null ? r.spreadBps + ' bps' : '—'}</td>
               <td>${r.sampleLoans != null ? r.sampleLoans + ' loans' : '—'}</td>
-              <td>${_confDots(r.confidence)}</td>
+              <td>${_confDots(_confFromLoans(r))}</td>
             </tr>`;
           }).join('')
         : `<tr class="rs-row-subject">
@@ -2299,13 +2306,23 @@ function renderOM() {
       // ── Mini stats ──
       const delinq    = a.rates?.delinquencyRate != null ? Number(a.rates.delinquencyRate).toFixed(2) + '%' : '—';
       const cre_yoy   = ei.creLendingYoY   != null ? (ei.creLendingYoY > 0 ? '+' : '') + Number(ei.creLendingYoY).toFixed(1) + '%' : '—';
-      const creditLbl = ei.creditConditionsLabel || '—';
+      const creditLbl = (() => {
+        const raw = (ei.creditConditionsLabel || '').trim();
+        if (!raw) return '—';
+        const lo = raw.toLowerCase();
+        if (lo.includes('expand') || lo.includes('loosen')) return 'Expanding';
+        if (lo.includes('tighten')) return 'Tightening';
+        if (lo.includes('stable') || lo.includes('neutral')) return 'Stable';
+        if (lo.includes('improv')) return 'Improving';
+        // fallback — first word, capitalized
+        const w = raw.split(/[\s,;.]/)[0];
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      })();
       const t5disp    = t5v != null ? t5v.toFixed(2) + '%' : '—';
 
       return `
       <div class="a-hero">
         <div>
-          <div class="a-env-chip ${chipClass}">${esc(envLabel)}</div>
           <div class="a-hero-headline">${esc(o.macroHeroHeadline || ei.macroHeadline || '')}</div>
         </div>
         <div class="a-bench-rail">
@@ -2373,9 +2390,9 @@ function renderOM() {
             <tbody>${_tableRows}</tbody>
           </table>
           <div class="rs-footnote">
-            <span>${_confDots('high')} High confidence (n≥50)</span>
-            <span>${_confDots('medium')} Medium confidence (n≥20)</span>
-            <span>${_confDots('low')} Low confidence (n&lt;20)</span>
+            <span>${_confDots('high')} High confidence (n&gt;30)</span>
+            <span>${_confDots('medium')} Medium confidence (16–30)</span>
+            <span>${_confDots('low')} Low confidence (n≤15)</span>
           </div>
         </div>
         <div class="a-side">
