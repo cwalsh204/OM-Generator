@@ -421,13 +421,13 @@
   .p1-quad-takeaway strong { color:var(--om-navy); font-weight:600; font-style:normal; }
 
   /* ─── Market Overview P2 — Supply Collapse + Employment Engine ─────── */
-  .p2-body { flex:1; display:flex; flex-direction:column; padding:0; }
+  .p2-body { flex:1; display:flex; flex-direction:column; padding:0 0 22px; }
   .p2-narrative-strip { padding:14px 40px 10px; background:var(--om-light-gray); border-bottom:1px solid var(--om-border); display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; }
   .p2-narrative { font-size:11.5px; line-height:1.55; color:var(--om-body); max-width:660px; }
   .p2-narrative strong { color:var(--om-navy); font-weight:600; }
   .p2-stat-stack { display:flex; gap:18px; }
   .p2-mini-stat { text-align:right; }
-  .p2-mini-stat-val { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:600; color:var(--om-navy); line-height:1; }
+  .p2-mini-stat-val { font-family:'Cormorant Garamond',serif; font-size:30px; font-weight:600; color:var(--om-navy); line-height:1; }
   .p2-mini-stat-val.gold { color:var(--om-gold); }
   .p2-mini-stat-val.red  { color:#c0392b; }
   .p2-mini-stat-label { font-size:8.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--om-gray); margin-top:4px; }
@@ -445,7 +445,7 @@
   .p2-sector-row { display:grid; grid-template-columns:18px 1fr auto; gap:8px; align-items:center; padding:5px 0; font-size:11px; }
   .p2-sector-row + .p2-sector-row { border-top:1px dotted var(--om-border); }
   .p2-sector-rank { font-family:'Cormorant Garamond',serif; font-size:14px; font-weight:600; color:var(--om-gold); text-align:center; }
-  .p2-sector-name { color:var(--om-body); font-weight:500; }
+  .p2-sector-name { color:var(--om-body); font-weight:500; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10.5px; }
   .p2-sector-bar-wrap { grid-column:2/-1; height:4px; background:#e6e9ee; border-radius:2px; overflow:hidden; margin-top:3px; }
   .p2-sector-bar-fill { height:100%; background:var(--om-blue); }
   .p2-sector-val { font-size:11px; font-weight:700; color:var(--om-navy); font-variant-numeric:tabular-nums; }
@@ -593,12 +593,6 @@
   .om-emp-table td { padding:7px 12px; border-bottom:1px solid var(--om-border); }
   .om-emp-table tr:nth-child(even) td { background:var(--om-light-gray); }
 
-  /* Rate stat grid — 4 across in landscape */
-  .om-rate-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
-  .om-rate-stat { padding:16px 18px; border:1px solid var(--om-border); border-radius:4px; border-top:3px solid var(--om-gold); }
-  .om-rate-stat-label { font-size:9px; text-transform:uppercase; letter-spacing:2px; color:var(--om-gray); margin-bottom:4px; }
-  .om-rate-stat-val { font-family:'Cormorant Garamond',serif; font-size:26px; color:var(--om-navy); line-height:1.1; }
-  .om-rate-stat-sub { font-size:10px; color:var(--om-gray); margin-top:3px; }
 
   /* ── S07-P3 Capital Markets & Macro ── */
   /* Hero strip */
@@ -666,6 +660,47 @@
   .a-mini-val { font-family:'Cormorant Garamond',serif; font-size:17px; font-weight:700; color:var(--om-navy); white-space:nowrap; }
   .a-mini-val.pos { color:#2d7a3a; }
   .a-mini-val.neg { color:#c0392b; }
+
+  /* Sponsor — Option B Profile Card */
+  .sp-logo-box { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#fff; border:1px solid var(--om-border); border-radius:8px; width:100%; height:148px; }
+  .sp-logo-mono { font-family:'Cormorant Garamond',serif; font-weight:700; color:var(--om-navy); font-size:60px; line-height:0.9; }
+  .sp-logo-word { font-size:8px; letter-spacing:3px; text-transform:uppercase; color:var(--om-gray); }
+  .sp-uploaded-logo { width:100%; height:148px; object-fit:contain; border-radius:8px; background:#fff; border:1px solid var(--om-border); padding:16px; box-sizing:border-box; }
+  .b-grid { flex:1; display:grid; grid-template-columns:268px 1fr; min-height:0; }
+  .b-rail { background:var(--om-light-gray); border:1px solid var(--om-border); border-radius:8px; padding:22px 20px; display:flex; flex-direction:column; gap:14px; }
+  .b-name { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:700; color:var(--om-navy); line-height:1.1; }
+  .b-facts { display:flex; flex-direction:column; }
+  .b-fact { border-top:1px solid var(--om-border); padding:9px 0; }
+  .b-fact:first-child { border-top:0; padding-top:0; }
+  .b-fact-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--om-gray); font-weight:600; margin-bottom:3px; }
+  .b-fact-val { font-size:13px; color:var(--om-navy); font-weight:600; line-height:1.3; }
+  .b-main { padding:0 0 0 30px; display:flex; flex-direction:column; }
+  .b-about { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--om-gold); font-weight:600; margin-bottom:10px; }
+  .b-main .om-prose { font-size:13px; line-height:1.7; color:#374151; }
+  .b-approach-wrap { margin-top:auto; padding-top:18px; }
+  .b-approach-label { font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--om-navy); font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+  .b-approach-label::after { content:''; flex:1; height:1px; background:var(--om-border); }
+  .b-pillars { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; }
+  .b-pillar { border-top:2px solid var(--bp-cat); padding-top:14px; }
+  .b-pillar:nth-child(1) { --bp-cat:var(--om-light-blue); }
+  .b-pillar:nth-child(2) { --bp-cat:var(--om-navy); }
+  .b-pillar:nth-child(3) { --bp-cat:var(--om-gold); }
+  .b-pillar-t { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:700; color:var(--om-navy); margin-bottom:9px; line-height:1.15; }
+  .b-pillar-b { font-size:12.5px; color:#4b5563; line-height:1.6; }
+
+  /* Executive Summary — Submarket & Demand Evidence rail */
+  .es-ban { margin-top:24px; padding-top:18px; border-top:1px solid var(--om-border); }
+  .es-ban-head { font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--om-navy); font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+  .es-ban-head::after { content:''; flex:1; height:1px; background:var(--om-border); }
+  .es-ban-head-txt { white-space:nowrap; }
+  .es-acc { color:var(--om-gold); }
+  .es-ev-rail { display:grid; gap:1px; background:var(--om-border); border:1px solid var(--om-border); border-radius:5px; overflow:hidden; }
+  .es-ev-cell { background:#fff; padding:16px; display:flex; flex-direction:column; justify-content:center; }
+  .es-ev-label { font-size:8.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--om-gray); font-weight:600; margin-bottom:8px; line-height:1.3; }
+  .es-ev-val { font-family:'Cormorant Garamond',serif; font-size:30px; font-weight:600; color:var(--om-navy); line-height:1; }
+  .es-ev-val small { font-size:16px; }
+  .es-ev-up { font-size:15px; color:var(--om-green,#4a9e6a); vertical-align:middle; margin-left:1px; }
+  .es-ev-sub { font-size:9px; color:var(--om-gold); margin-top:8px; letter-spacing:0.3px; }
 </style>
 </head>
 <body>
@@ -695,26 +730,6 @@ const fmtCur=v=>{if(!v)return"—";const n=parseFloat(String(v).replace(/[^0-9.]
 const fmtPct=v=>{if(!v)return"—";const n=parseFloat(String(v).replace(/[^0-9.]/g,""));return isNaN(n)?v:n+"%";};
 const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-window.manualAcreData = null;
-function validateAcreData(val) {
-  const status = document.getElementById('acre-data-status');
-  if (!status) return;
-  const trimmed = (val || '').trim();
-  if (!trimmed) { status.style.display = 'none'; window.manualAcreData = null; return; }
-  try {
-    const parsed = JSON.parse(trimmed);
-    const fields = Object.keys(parsed).filter(k => parsed[k] !== null);
-    status.style.display = 'block';
-    status.style.color = 'var(--success)';
-    status.textContent = `✓ Valid A.CRE data — ${fields.length} sections loaded: ${fields.join(', ')}`;
-    window.manualAcreData = parsed;
-  } catch(e) {
-    status.style.display = 'block';
-    status.style.color = 'var(--err)';
-    status.textContent = '✗ Invalid JSON — please check the format';
-    window.manualAcreData = null;
-  }
-}
 
 function attachListeners(){
   Object.keys(inputs).forEach(key=>{
@@ -766,10 +781,6 @@ function s0(){return`
   </div>
   <p style="font-size:11px;color:var(--text-3);margin-bottom:4px;">Tip: You can assign multiple photos to <strong style="color:var(--text-2);">Gallery</strong>. All other sections use the first photo assigned to that tag.</p>
   <div class="tagged-img-list" id="taggedImgList"></div>
-  <div class="section-label">A.CRE Intelligence Data (optional)</div>
-  <p style="font-size:12px;color:var(--text-2);margin-bottom:10px;">Paste JSON exported from A.CRE Intelligence Hub in Claude.ai. Provides highest-quality market data and reduces API costs.</p>
-  <textarea id="acreDataInput" placeholder="Paste A.CRE JSON here (optional)..." rows="4" oninput="validateAcreData(this.value)" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:monospace;font-size:12px;padding:9px 12px;resize:vertical;"></textarea>
-  <div id="acre-data-status" style="display:none;font-size:12px;margin-top:6px;"></div>
   <div class="section-label">Branding (optional)</div>
   <div class="grid2">${f("brokerName","Broker / firm name")}${f("tagline","Offering tagline","text",null,false,"Leave blank for AI to generate")}</div>`;}
 
@@ -779,8 +790,6 @@ const TAG_OPTIONS = [
   { value:'property', label:'Property Overview Header' },
   { value:'detail',   label:'Property Detail (Asset Profile)' },
   { value:'gallery',  label:'Gallery' },
-  { value:'location', label:'Location Overview' },
-  { value:'market',   label:'Market Overview' },
   { value:'sponsor',  label:'Sponsor / Logo' }
 ];
 
@@ -1009,13 +1018,7 @@ function renderOM() {
     : `<div class="om-cover-photo-placeholder"><span style="font-family:'Cormorant Garamond',serif;font-size:28px;color:rgba(255,255,255,0.12);letter-spacing:4px;">PROPERTY PHOTO</span></div>`;
 
   const propImgSrc = getImageByTag('property');
-  const locPhotoSrc = getImageByTag('location');
-  const locPhoto = locPhotoSrc
-    ? `<img class="om-section-photo" src="${locPhotoSrc}" alt="Neighborhood">`
-    : '';
-
   const detailImgSrc = getImageByTag('detail');
-  const marketImgSrc = getImageByTag('market');
   const sponsorImgSrc = getImageByTag('sponsor');
 
   const galleryImgSrcs = getImagesByTag('gallery');
@@ -1204,14 +1207,39 @@ function renderOM() {
           <p class="om-prose">${esc(o.executiveSummary||'')}</p>
         </div>
       </div>
-      <div class="om-timeline" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--om-border);">
-        ${inputs.yearBuilt?`<div class="om-timeline-node"><div class="om-timeline-dot"></div><div class="om-timeline-label"><span class="om-timeline-year">${esc(inputs.yearBuilt)}</span><span class="om-timeline-desc">Built${inputs.yearReno?' / '+inputs.yearReno:''}</span></div></div><div class="om-timeline-line"></div>`:''}
-        <div class="om-timeline-node"><div class="om-timeline-dot" style="background:var(--om-light-blue);"></div><div class="om-timeline-label"><span class="om-timeline-year">${inputs.t12Year || new Date().getFullYear()}</span><span class="om-timeline-desc">Current T12</span></div></div>
-        <div class="om-timeline-line"></div>
-        <div class="om-timeline-node"><div class="om-timeline-dot" style="background:var(--om-navy);"></div><div class="om-timeline-label"><span class="om-timeline-year">${new Date().getFullYear()+2}</span><span class="om-timeline-desc">Stabilized</span></div></div>
-        <div class="om-timeline-line"></div>
-        <div class="om-timeline-node"><div class="om-timeline-dot" style="background:var(--om-gold);"></div><div class="om-timeline-label"><span class="om-timeline-year">${new Date().getFullYear()+(parseInt(inputs.loanTerm)||5)}</span><span class="om-timeline-desc">Exit / Refi</span></div></div>
-      </div>
+      ${(() => {
+        const ord = n => { n = Math.round(n); const s = ['th','st','nd','rd'], v = n % 100; return (s[(v-20)%10] || s[v] || s[0]); };
+        const fmtK = n => n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1)+'M' : n >= 1e3 ? Math.round(n/1e3)+'K' : String(Math.round(n));
+
+        const dem    = a.census?.demographics || {};
+        const hhiPct = dem.median_household_income?.national_percentile ?? null;
+        const bach   = parseFloat(dem.bachelor_degree_or_higher?.value ?? '');
+        const empBase = Number(a.employment?.qcew?.total_employment || 0);
+        const popG   = a.census?.demographics?.population_growth?.value ?? a.market?.populationGrowth10y ?? null;
+        const spi    = a.permits?.supply_pressure_index?.current_score ?? null;
+        const spiPct = a.permits?.supply_pressure_index?.national_percentile ?? null;
+
+        const cells = [];
+        if (hhiPct != null)
+          cells.push({ l:'Median HH Income', v:`${Math.round(hhiPct)}<small>${ord(hhiPct)}</small>`, s:'National percentile' });
+        if (!isNaN(bach))
+          cells.push({ l:'College-Educated', v:`${bach.toFixed(1)}<small>%</small>`, s:'of population' });
+        if (empBase > 0)
+          cells.push({ l:'Employment Base', v:fmtK(empBase), s:`${esc(inputs.city||'Submarket')} jobs` });
+        if (popG != null)
+          cells.push({ l:'Population Growth', v:`${Number(popG)>0?'+':''}${(+popG).toFixed(1)}<small>%</small><span class="es-ev-up">▲</span>`, s:'11-yr growth' });
+        if (spi != null)
+          cells.push({ l:'Supply Pressure', v:`${spi}`, s:spiPct != null ? `${Math.round(spiPct)}${ord(spiPct)} pctile · constrained` : 'constrained' });
+
+        if (!cells.length) return '';
+        return `
+      <div class="es-ban">
+        <div class="es-ban-head"><span class="es-ban-head-txt">Submarket &amp; <span class="es-acc">Demand Evidence</span></span></div>
+        <div class="es-ev-rail" style="grid-template-columns:repeat(${cells.length},1fr);">
+          ${cells.map(c=>`<div class="es-ev-cell"><div class="es-ev-label">${c.l}</div><div class="es-ev-val">${c.v}</div><div class="es-ev-sub">${c.s}</div></div>`).join('')}
+        </div>
+      </div>`;
+      })()}
     </div>
     ${secFooter('Section 01','Executive Summary')}
   </div>
@@ -1916,8 +1944,8 @@ function renderOM() {
 
       const spiScore  = a.permits?.supply_pressure_index?.current_score ?? null;
       const spiPct    = a.permits?.supply_pressure_index?.national_percentile ?? null;
-      const permitsYTD= a.permits?.ytd_2025 ?? a.permits?.trailing_12_months?.total_units ?? null;
-      const stalled   = a.market?.stalledPipelineUnits ?? null;
+      const permitsYTD= a.permits?.ytd_2026 ?? a.permits?.ytd_2025 ?? a.permits?.trailing_12_months?.total_units ?? null;
+      const vacancyRate = a.market?.vacancyRate != null ? parseFloat(a.market.vacancyRate) : null;
 
       const ei        = a.economicIndicators || {};
       const macroEnv  = (ei.macroEnvironment || 'neutral').toLowerCase();
@@ -2030,9 +2058,9 @@ function renderOM() {
             <div class="p1-bar-row">${bar(spiPct,true)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Pipeline Stalled / Entitled-Unbuilt</span>
-            <span class="p1-metric-val">${stalled ? Number(stalled).toLocaleString()+'+' : '—'}</span>
-            <div class="p1-bar-row">${bar(null)}<div class="p1-rank">—</div></div>
+            <span class="p1-metric-label">MF Vacancy Rate <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-val">${vacancyRate != null ? vacancyRate.toFixed(1)+'%' : '—'}</span>
+            <div class="p1-bar-row">${bar(vacancyRate != null ? Math.max(0, Math.min(100, Math.round((1 - vacancyRate/15)*100))) : null, false)}<div class="p1-rank">${vacancyRate != null ? (vacancyRate <= 4 ? 'Very tight' : vacancyRate <= 6 ? 'Below avg.' : vacancyRate <= 9 ? 'Average' : 'Above avg.') : '—'}</div></div>
           </div>
           <div class="p1-quad-takeaway">${esc((o.marketSupplyDemand||'').substring(0,150))}…</div>
         </div>
@@ -2070,8 +2098,7 @@ function renderOM() {
     ${secHeader('07','Market Overview','Supply Collapse · Employment Engine')}
     ${(()=>{
       const ei         = a.economicIndicators || {};
-      const permitsYTD = a.permits?.ytd_2025 ?? a.permits?.trailing_12_months?.total_units ?? null;
-      const stalled    = a.market?.stalledPipelineUnits ?? null;
+      const permitsYTD = a.permits?.ytd_2026 ?? a.permits?.ytd_2025 ?? a.permits?.trailing_12_months?.total_units ?? null;
       const empYoY     = a.employment?.yoy_growth ?? a.employment?.qcew?.yoy_growth ?? null;
       const fmtPct     = v => v==null ? '—' : `${v>0?'+':''}${v}%`;
       const rentStabDate = a.market?.rentStabilizationDate || 'Recent Legislation';
@@ -2122,18 +2149,14 @@ function renderOM() {
     <div class="om-sec-body p2-body">
       <div class="p2-narrative-strip">
         <div class="p2-narrative">${esc(o.marketSupplyDemand||'')}</div>
-        <div class="p2-stat-stack">
+        <div class="p2-stat-stack" style="gap:28px;">
           <div class="p2-mini-stat">
             <div class="p2-mini-stat-val red">${permitsYTD != null ? Number(permitsYTD).toLocaleString() : '—'}</div>
-            <div class="p2-mini-stat-label">Permits YTD</div>
+            <div class="p2-mini-stat-label">MF Permits YTD</div>
           </div>
-          <div class="p2-mini-stat">
-            <div class="p2-mini-stat-val gold">${stalled ? (stalled/1000).toFixed(0)+'K+' : '—'}</div>
-            <div class="p2-mini-stat-label">Stalled Units</div>
-          </div>
-          <div class="p2-mini-stat">
-            <div class="p2-mini-stat-val">${empYoY!=null ? fmtPct(empYoY) : '—'}</div>
-            <div class="p2-mini-stat-label">Employment YoY</div>
+          <div class="p2-mini-stat" style="border-left:1px solid var(--om-border);padding-left:28px;">
+            <div class="p2-mini-stat-val ${empCAGR!=null && empCAGR>0 ? '' : 'red'}">${empCAGR!=null ? (empCAGR>0?'+':'')+empCAGR+'%' : '—'}</div>
+            <div class="p2-mini-stat-label">${empVals.length-1}-Yr Emp. Growth</div>
           </div>
         </div>
       </div>
@@ -2143,12 +2166,12 @@ function renderOM() {
           <div class="p2-section-sub">Units Permitted · ${permitYears[0]} – ${permitYears[permitYears.length-1]} YTD</div>
           <div class="p2-section-source">Census BPS · A.CRE <span class="acre-badge-light">Live</span></div>
         </div>
-        <div class="p2-chart" style="height:210px;">
-          <svg viewBox="0 0 960 210" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+        <div class="p2-chart" style="height:175px;">
+          <svg viewBox="0 0 960 240" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
             <g font-family="DM Sans" font-size="9" fill="#6b7280">${permitGridSVG}</g>
             ${permitBarsSVG}
-            <line x1="722" y1="30" x2="722" y2="195" stroke="#c9a84c" stroke-width="1.5" stroke-dasharray="5,3"/>
-            <g transform="translate(722,30)">
+            <line x1="722" y1="55" x2="722" y2="210" stroke="#c9a84c" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <g transform="translate(722,55)">
               <rect x="-95" y="-11" width="190" height="20" fill="#c9a84c" rx="2"/>
               <text x="0" y="3" text-anchor="middle" font-family="DM Sans" font-size="9" font-weight="700" fill="#fff" letter-spacing="0.5">▼ ${rentStabDate.toUpperCase()} — RENT STABILIZATION</text>
             </g>
@@ -2158,7 +2181,7 @@ function renderOM() {
           </svg>
         </div>
       </div>
-      <div class="p2-section" style="padding-top:10px;padding-bottom:14px;flex:1;display:flex;flex-direction:column;">
+      <div class="p2-section" style="padding-top:10px;padding-bottom:4px;flex:1;display:flex;flex-direction:column;">
         <div class="p2-section-head">
           <div class="p2-section-title">${esc(inputs.city||'Submarket')} Employment Engine</div>
           <div class="p2-section-sub">Total Jobs · ${empYears[0]} – ${empYears[empYears.length-1]} with Sector Mix</div>
@@ -2230,11 +2253,8 @@ function renderOM() {
       const shelter  = _pct(ei.shelterInflation);
       const constCost = _pct(ei.constructionCostYoY);
 
-      // ── Narrative — use A.CRE macroNarrative; splice in live rates ──
-      const baseNarr = ei.macroNarrative || o.marketMacroBackdrop || '';
-      const narr = baseNarr.length > 20
-        ? baseNarr
-        : `With the <b>10Y UST at ${t10v.toFixed(2)}%</b> and Freddie agency debt pricing near <b>${fmfv.toFixed(2)}%</b>, borrowing costs ${spreadBps > 160 ? 'remain elevated' : 'are holding steady'} against the current inflation backdrop. ${ei.creditConditionsLabel ? ei.creditConditionsLabel + ' credit conditions support' : 'Agency credit supports'} stabilized asset execution.`;
+      // ── Narrative — Claude-generated from live data points ──
+      const narr = o.macroNarrativeShort || o.marketMacroBackdrop || '';
 
       // ── Rate sheet table rows ──
       // Build from A.CRE rateSheet.rows if available; fall back to a single subject row
@@ -2286,7 +2306,7 @@ function renderOM() {
       <div class="a-hero">
         <div>
           <div class="a-env-chip ${chipClass}">${esc(envLabel)}</div>
-          <div class="a-hero-headline">${esc(ei.macroHeadline || narr.replace(/<[^>]+>/g,'').slice(0,120))}</div>
+          <div class="a-hero-headline">${esc(o.macroHeroHeadline || ei.macroHeadline || '')}</div>
         </div>
         <div class="a-bench-rail">
           <div class="a-bench">
@@ -2308,7 +2328,7 @@ function renderOM() {
       </div>
 
       <div class="a-infl-band">
-        <div class="a-infl-narr">${narr}</div>
+        <div class="a-infl-narr">${narr.replace(/&lt;b&gt;/g,'<b>').replace(/&lt;\/b&gt;/g,'</b>')}</div>
         <div class="a-infl-points">
           <div class="a-infl-pt">
             <div class="a-infl-pt-label">CPI-U YoY</div>
@@ -2336,7 +2356,16 @@ function renderOM() {
       <div class="a-body">
         <div class="a-matrix-pane">
           <div class="a-pane-title">Agency Rate Sheet — Term &times; LTV <span class="acre-badge-light">${anyRateFallback ? 'Estimated' : 'A.CRE Live'}</span></div>
-          <div class="a-pane-cap">${esc(rs.rateSheetNarrative || 'Indicative all-in rates and weighted-average spreads over matching UST, derived from recent Freddie K-Deal and SB pool data.')}</div>
+          <div class="a-pane-cap">${(() => {
+            const narText = rs.rateSheetNarrative || '';
+            const poolMatch = narText.match(/(\d+)\s+recent\s+Freddie/i) || narText.match(/based on (\d+)/i);
+            const dateMatch = narText.match(/priced\s+(\d{4}-\d{2}-\d{2})/i);
+            const poolCount = poolMatch ? poolMatch[1] : (_rsRows ? _rsRows.length : null);
+            const dealDate  = dateMatch ? dateMatch[1] : null;
+            return 'Indicative all-in rates and loan-count-weighted spreads over the matching UST'
+              + (poolCount ? `, derived from ${poolCount} recent Freddie pool aggregates` : ', derived from recent Freddie K-Deal and SB pool data')
+              + (dealDate  ? `. Most recent deal priced ${dealDate}.` : '.');
+          })()}</div>
           <table class="rs-table">
             <thead>
               <tr><th>Term &amp; LTV</th><th>Indicative Rate</th><th>WAvg Spread</th><th>Sample</th><th>Conf.</th></tr>
@@ -2405,7 +2434,6 @@ function renderOM() {
   <div class="om-section">
     ${secHeader('09','Financials','Financial Analysis')}
     <div class="om-sec-body">
-      <p style="font-size:12px;color:var(--om-gray);margin-bottom:14px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;">${esc(o.financialSummaryNarrative||'')}</p>
       ${(()=>{
         const _numUnits = parseInt(String(inputs.totalUnits||'0').replace(/[^0-9]/g,''))||0;
         const _noiNum   = T12.noi !== null ? Math.abs(T12.noi) : (inputs.noi ? parseFloat(String(inputs.noi).replace(/[^0-9.]/g,'')) : null);
@@ -2420,17 +2448,18 @@ function renderOM() {
           <div class="om-fin-stat"><div class="om-fin-stat-label">Rental as % of EGI</div><div class="om-fin-stat-value">${_revMix}</div></div>
         </div>`;
       })()}
-      <div class="om-chart-title">NOI Bridge <span style="font-size:9px;color:var(--om-gray);">(values in thousands)</span></div>
-      <div class="om-chart-wrap" style="height:180px;"><canvas id="chart-noi-bridge"></canvas></div>
+      <div class="om-chart-title">NOI Bridge</div>
+      <div class="om-chart-wrap" style="height:185px;"><canvas id="chart-noi-bridge"></canvas></div>
       <div style="display:flex;gap:20px;margin-top:16px;">
         <div style="flex:1;">
           <div class="om-chart-title">OpEx Breakdown</div>
           <div class="om-chart-wrap" style="height:220px;"><canvas id="chart-opex-breakdown"></canvas></div>
         </div>
-        <div style="flex:1;">
-          <div class="om-chart-title">Revenue Composition</div>
-          <div class="om-chart-wrap" style="height:220px;"><canvas id="chart-revenue-mix"></canvas></div>
-          <div id="legend-revenue-mix" style="display:flex;gap:14px;justify-content:center;margin-top:8px;flex-wrap:wrap;font-size:11px;color:var(--om-gray);"></div>
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div class="om-chart-title">Financial Summary</div>
+          <div style="flex:1;background:var(--om-light-gray);border:1px solid var(--om-border);border-radius:6px;padding:20px 22px;display:flex;align-items:center;">
+            <p style="font-size:13.5px;line-height:1.75;color:var(--om-navy);margin:0;">${esc(o.financialSummaryNarrative||'')}</p>
+          </div>
         </div>
       </div>
     </div>
@@ -2440,12 +2469,35 @@ function renderOM() {
   <!-- ══ S09: SPONSOR ══ -->
   <div class="om-section">
     ${secHeader('10','Sponsor Overview','')}
-    <div class="om-sec-body">
-      ${sponsorImgSrc?`<img class="om-sponsor-logo" src="${sponsorImgSrc}" alt="Sponsor logo">`:``}
-      ${inputs.sponsorName?`<div class="om-sponsor-name">${esc(inputs.sponsorName)}</div>`:''}
-      <p class="om-prose">${esc(o.sponsorOverview||'')}</p>
-      ${inputs.sponsorTrack?`<div class="om-callout" style="margin-top:16px;">${esc(inputs.sponsorTrack)}</div>`:''}
-      ${inputs.guarantor?`<div class="om-guarantor-box"><div class="om-guarantor-label">Guarantor Entity</div><div class="om-guarantor-val">${esc(inputs.guarantor)}</div></div>`:''}
+    <div class="om-sec-body" style="padding:24px 40px;">
+      <div class="b-grid">
+        <div class="b-rail">
+          ${sponsorImgSrc
+            ? `<img class="sp-uploaded-logo" src="${sponsorImgSrc}" alt="${esc(inputs.sponsorName||'Sponsor')} logo">`
+            : `<div class="sp-logo-box"><div class="sp-logo-mono">${esc((inputs.sponsorName||'S').charAt(0).toUpperCase())}</div><div class="sp-logo-word">${esc(inputs.sponsorName||'Sponsor')}</div></div>`
+          }
+          ${inputs.sponsorName?`<div class="b-name">${esc(inputs.sponsorName)}</div>`:''}
+          <div class="b-facts">
+            ${inputs.guarantor?`<div class="b-fact"><div class="b-fact-label">Guarantor Entity</div><div class="b-fact-val">${esc(inputs.guarantor)}</div></div>`:''}
+            ${(o.sponsorGlanceFacts||[]).map(f=>`<div class="b-fact"><div class="b-fact-label">${esc(f.label||'')}</div><div class="b-fact-val">${esc(f.value||'')}</div></div>`).join('')}
+          </div>
+        </div>
+        <div class="b-main">
+          <div class="b-about">About the Sponsor</div>
+          <p class="om-prose">${esc(o.sponsorOverview||'')}</p>
+          ${(o.sponsorApproachPillars||[]).length>=1 ? `
+          <div class="b-approach-wrap">
+            <div class="b-approach-label">Investment Approach</div>
+            <div class="b-pillars">
+              ${(o.sponsorApproachPillars||[]).slice(0,3).map(p=>`
+              <div class="b-pillar">
+                <div class="b-pillar-t">${esc(p.title||'')}</div>
+                <div class="b-pillar-b">${esc(p.body||'')}</div>
+              </div>`).join('')}
+            </div>
+          </div>` : inputs.sponsorTrack ? `<div class="om-callout" style="margin-top:auto;">${esc(inputs.sponsorTrack)}</div>` : ''}
+        </div>
+      </div>
     </div>
     ${secFooter('Section 10','Sponsor')}
   </div>
@@ -2511,7 +2563,7 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
           const val = safeNum(ds.data[i]);
           if (!val || val === 0) return;
           const absVal = Math.abs(val);
-          const label = '$' + (absVal >= 1000 ? (absVal / 1000).toFixed(0) + 'K' : absVal.toLocaleString());
+          const label = '$' + (absVal >= 1000000 ? (absVal / 1000000).toFixed(1) + 'M' : absVal >= 1000 ? (absVal / 1000).toFixed(0) + 'K' : absVal.toLocaleString());
           ctx.save();
           ctx.font = 'bold 10px DM Sans, sans-serif';
           ctx.fillStyle = '#1e3a5f';
@@ -2568,21 +2620,6 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
     }
     return _empFallback;
   })();
-  makeChart('chart-macro-employers', {
-    type: 'bar',
-    data: {
-      labels: _empSectors.map(e => e.label),
-      datasets: [{ label: 'Employees', data: _empSectors.map(e => e.count), backgroundColor: '#1e3a5f', borderColor: '#c9a84c', borderWidth: 1, borderRadius: 3 }]
-    },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => Number(ctx.raw).toLocaleString() + ' employees' } } },
-      scales: {
-        x: { ticks: { callback: v => Number(v).toLocaleString() }, grid: { color: 'rgba(0,0,0,0.05)' } },
-        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
-      }
-    }
-  });
 
   // ── Location page — employment sectors horizontal bar ────────────
   const _locEmpSectors = (() => {
@@ -2726,7 +2763,7 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
         tooltip: { callbacks: { label: ctx => '$' + Number(ctx.raw).toLocaleString() } }
       },
       scales: {
-        y: { ticks: { callback: v => '$' + (Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(0) + 'K' : v) }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { ticks: { callback: v => { const a = Math.abs(v); return '$' + (a >= 1000000 ? (a/1000000).toFixed(1)+'M' : a >= 1000 ? (a/1000).toFixed(0)+'K' : v); } }, grid: { color: 'rgba(0,0,0,0.05)' } },
         x: { grid: { display: false } }
       }
     }
@@ -2761,39 +2798,12 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
         tooltip: { callbacks: { label: ctx => '$' + Number(ctx.raw).toLocaleString() } }
       },
       scales: {
-        x: { ticks: { callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'K' : v) }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { ticks: { callback: v => '$' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v) }, grid: { color: 'rgba(0,0,0,0.05)' } },
         y: { grid: { display: false }, ticks: { font: { size: 10 } } }
       }
     }
   });
 
-  // ── Revenue composition donut ─────────────────────────────────────
-  const _rcRental  = safeNum(_totalRentalCalc !== null ? Math.abs(_totalRentalCalc) : 0);
-  const _rcOther   = safeNum(T12.totalOther   !== null ? Math.abs(T12.totalOther)   : 0);
-  const _rcVacancy = safeNum(T12.vacancy      !== null ? Math.abs(T12.vacancy)      : 0);
-  makeChart('chart-revenue-mix', {
-    type: 'doughnut',
-    data: {
-      labels: ['Rental Revenue', 'Other Income', 'Vacancy Loss'],
-      datasets: [{ data: [_rcRental, _rcOther, _rcVacancy], backgroundColor: [blue, gold, '#e05050'], borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ctx.label + ': $' + Number(ctx.raw).toLocaleString() } }
-      }
-    }
-  });
-  // Custom HTML legend
-  const _rmLegend = document.getElementById('legend-revenue-mix');
-  if (_rmLegend) {
-    const _rmColors = [blue, gold, '#e05050'];
-    const _rmLabels = ['Rental Revenue', 'Other Income', 'Vacancy Loss'];
-    _rmLegend.innerHTML = _rmLabels.map((l, i) =>
-      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:${_rmColors[i]};display:inline-block;"></span>${l}</span>`
-    ).join('');
-  }
 }
 
 async function generateOM(){
@@ -2832,7 +2842,7 @@ async function generateOM(){
     const resp=await fetch("/api/generate",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({inputs,parsedFiles,manualAcreData:window.manualAcreData||null})
+      body:JSON.stringify({inputs,parsedFiles})
     });
     clearInterval(stepInterval);
     const data=await resp.json();

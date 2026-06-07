@@ -27,7 +27,6 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // ─── A.CRE DATA CACHE (30 min, keyed by address|city|state) ──────────────────
 let acreCache = {};
-const CACHE_TTL = 30 * 60 * 1000;
 
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
@@ -335,6 +334,9 @@ Search queries to run:
 - "${inputs.city} ${inputs.state} major employers 2025"
 - "${inputs.city} Class A apartment rent comps 2025"
 - "${acreData.county} rent stabilization rent control 2024 2025"
+- "grocery stores restaurants retail near ${inputs.address} ${inputs.city} ${inputs.state} walking distance miles"
+- "metro subway bus transit stops near ${inputs.address} ${inputs.city} distance"
+- "walk score ${inputs.address} ${inputs.city} ${inputs.state}"
 
 Return this exact JSON structure with real numbers only:
 {
@@ -388,7 +390,18 @@ Return this exact JSON structure with real numbers only:
     "macroNarrative": string|null
   },
   "legislation": string|null,
-  "marketNarrative": string|null
+  "marketNarrative": string|null,
+  "locationAmenities": {
+    "walkScore": number|null,
+    "transitScore": number|null,
+    "bikeScore": number|null,
+    "nearbyRetail": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyDining": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyTransit": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyEducation": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyHealthcare": [{"name": string, "type": string, "distanceMiles": number}],
+    "neighborhoodNarrative": string|null
+  }
 }`;
 
   try {
@@ -491,6 +504,7 @@ async function fillDataGaps(haikusData, address, city, state, county) {
   if (!haikusData?.multifamilyMarket?.vacancyRatePct) missingFields.push(city + ' multifamily vacancy rate 2025 2026 CBRE JLL');
   if (!haikusData?.demographics?.medianHouseholdIncome) missingFields.push(city + ' ' + state + ' median household income census 2024');
   if (!haikusData?.macroBackdrop?.macroNarrative) missingFields.push('multifamily market outlook 2026 Freddie Mac Fannie Mae');
+  if (!haikusData?.locationAmenities?.nearbyRetail?.length) missingFields.push(`walking distance to retail grocery restaurants transit from ${address} ${city} ${state} — return specific place names and distances in miles from this exact address`);
 
   if (missingFields.length === 0) {
     console.log('Haiku web search complete — no gaps to fill');
@@ -518,9 +532,13 @@ Return JSON with only these fields:
   "macroNarrative": string|null,
   "locationAmenities": {
     "walkScore": number|null,
+    "transitScore": number|null,
+    "bikeScore": number|null,
     "nearbyRetail": [{"name": string, "type": string, "distanceMiles": number}],
-    "nearbyDining": [{"name": string, "type": string}],
-    "nearbyTransit": [{"name": string, "type": string}],
+    "nearbyDining": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyTransit": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyEducation": [{"name": string, "type": string, "distanceMiles": number}],
+    "nearbyHealthcare": [{"name": string, "type": string, "distanceMiles": number}],
     "neighborhoodNarrative": string|null
   }
 }`
@@ -725,20 +743,6 @@ app.post("/api/generate", async (req, res) => {
       webFallbacks.webData = await fillDataGaps(webFallbacks.webData, address, inputs.city, inputs.state, county);
     }
 
-    // Part 4: Manual A.CRE data override (highest priority)
-    if (req.body.manualAcreData) {
-      try {
-        const manualData = typeof req.body.manualAcreData === 'string'
-          ? JSON.parse(req.body.manualAcreData)
-          : req.body.manualAcreData;
-        Object.assign(acreData, manualData);
-        if (manualData.rates) acreData.sources = Object.fromEntries(Object.keys(acreData.sources || {}).map(k => [k, 'acre_live']));
-        console.log('Manual A.CRE data loaded — overriding web search for available fields');
-      } catch(err) {
-        console.log('Manual A.CRE data parse failed:', err.message);
-      }
-    }
-
     // Step 3: Build combined data context
     console.log("Step 3: Building data context...");
     const dataContext = buildDataContext(acreData, webFallbacks, inputs);
@@ -880,6 +884,11 @@ app.post("/api/generate", async (req, res) => {
       console.log('Normalized macroEnvironment →', acreData.economicIndicators.macroEnvironment);
     }
 
+    // Forward web-sourced vacancy rate into market object for renderer
+    const _webVacancy = webFallbacks.webData?.multifamilyMarket?.vacancyRatePct
+      ?? webFallbacks.haikusData?.multifamilyMarket?.vacancyRatePct
+      ?? null;
+
     // Attach A.CRE data for renderer
     omContent._acreData = {
       county:              acreData.county,
@@ -891,7 +900,11 @@ app.post("/api/generate", async (req, res) => {
       census:              acreData.census              || null,
       employment:          acreData.employment          || null,
       permits:             acreData.permits             || null,
-      economicIndicators:  acreData.economicIndicators  || null
+      economicIndicators:  acreData.economicIndicators  || null,
+      market: {
+        stalledPipelineUnits: acreData.market?.stalledPipelineUnits ?? null,
+        vacancyRate:          _webVacancy
+      }
     };
 
     console.log(`═══ OM generation complete for: ${inputs.propName} ═══\n`);
@@ -1094,16 +1107,20 @@ Return JSON with these exact keys:
 - propertyCondition (2 sentences — physical condition and CapEx)
 - locationEmployers (2-3 sentences — cite top employment sectors from A.CRE data)
 - locationMajorEmployers (array of up to 5 objects { name, employees } — specific named companies and organizations that are major employers near this property; use EMPLOYMENT top employers data; employees as integer headcount e.g. 11100; ONLY real named companies — never industry sector labels like "Professional Services" or "Public Administration")
-- locationRetail (array of up to 4 objects { name, desc, distance, mode } — anchor retail centers, groceries, lifestyle districts near the property; use LOCATION AMENITIES data; distance as "~0.3 mi" or "~5 min drive"; mode as "walk" or "drive")
-- locationEducation (array of up to 4 objects { name, desc, distance, mode } — schools and universities near the property; use LOCATION AMENITIES data)
-- locationTransit (array of up to 4 objects { name, desc, distance, mode } — metro stations, highway interchanges, airports near the property; use LOCATION AMENITIES data)
+- locationRetail (array of up to 4 objects { name, desc, distance, mode } — anchor retail centers, groceries, lifestyle districts near the property; use LOCATION AMENITIES distanceMiles values exactly as searched — do NOT estimate distances; format as "~X.X mi"; mode "walk" if distanceMiles <= 0.6 else "drive")
+- locationEducation (array of up to 4 objects { name, desc, distance, mode } — schools and universities near the property; use LOCATION AMENITIES distanceMiles values exactly as searched — do NOT estimate distances; format as "~X.X mi"; mode "walk" if distanceMiles <= 0.6 else "drive")
+- locationTransit (array of up to 4 objects { name, desc, distance, mode } — metro stations, highway interchanges, airports near the property; use LOCATION AMENITIES distanceMiles values exactly as searched — do NOT estimate distances; format as "~X.X mi"; mode "walk" if distanceMiles <= 0.6 else "drive")
 - marketOverview (3-4 sentences — cite vacancy rates and rent figures from web research)
 - marketSupplyDemand (2-3 sentences — cite Supply Pressure Index score and percentile)
 - marketEmploymentNarrative (2-3 sentences — cite Property Demand Index score)
 - marketRentComps (2-3 sentences — cite specific rent figures from web research)
 - marketMacroBackdrop (2-3 sentences — cite rate environment from A.CRE data)
+- macroHeroHeadline (1 punchy sentence, max 140 characters — lead with the credit conditions (expanding/tightening/stable) and rate environment (10Y UST level, Freddie MF rate), then the inflation signal (CPI direction), ending with the implication for stabilized multifamily assets. Use the actual numbers from RATES and ECONOMIC INDICATORS data. Do NOT start with the macro environment label word. Focus on credit and rates first.)
+- macroNarrativeShort (exactly 2-3 sentences of concise narrative — Sentence 1: weave in the live 10Y UST rate, Freddie MF rate, and CPI YoY with directional language (e.g. "re-accelerating", "cooling", "holding steady"). Sentence 2: frame shelter inflation for rent implications — use the actual shelterInflation figure and describe whether it underpins, moderates, or pressures rent growth. Sentence 3: frame construction cost YoY for supply implications — use the actual constructionCostYoY figure and describe whether it suppresses, moderates, or stimulates new supply. Each sentence must reflect the actual direction of the data. Bold key numbers using <b>X%</b> HTML tags.)
 - financialSummaryNarrative (2 sentences — contextualize deal metrics vs market)
-- sponsorOverview (3-4 sentences)`;
+- sponsorOverview (3-4 sentences)
+- sponsorGlanceFacts (array of up to 5 objects {label, value} — extract structured facts from inputs.sponsorTrack and inputs.sponsorName. Only include facts explicitly stated — never fabricate. Typical labels: "Experience", "Focus", "Markets", "Strategy", "Role on Deal". Values should be short — e.g. "10 Years", "Class A Multifamily", "DC · MD · VA", "Value-Add", "Guarantor · Non-Recourse". Return [] if track record is empty.)
+- sponsorApproachPillars (array of exactly 3 objects {title, body} — distill 3 investment approach pillars from the sponsor narrative and track record. Title: 2-4 words, Cormorant-style headline. Body: 1-2 sentences, max 25 words, grounded only in what the sponsor actually wrote. Return [] if insufficient information.)`;
 }
 
 // ─── JSON EXTRACTOR ───────────────────────────────────────────────────────────
