@@ -29,11 +29,10 @@ app.use(express.static(path.join(__dirname, "public")));
 // ─── UPSTASH REDIS CLIENT (persistent cache across serverless instances) ───────
 let redis = null;
 try {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    redis = new Redis({
-      url:   process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+  const redisUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.KV_REST_API_TOKEN  || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (redisUrl && redisToken) {
+    redis = new Redis({ url: redisUrl, token: redisToken });
     console.log('Upstash Redis client initialised');
   } else {
     console.log('Upstash env vars not set — Redis cache disabled');
