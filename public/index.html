@@ -2194,8 +2194,6 @@ function renderOM() {
       const permitYears= annual.length>=2 ? annual.map(d=>d.year) : [2018,2019,2020,2021,2022,2023,2024,2025];
       const permitVals = annual.length>=2 ? annual.map(d=>d.units||d.permits||0) : [2800,3200,2100,3500,2900,1800,620,permitsYTD||54];
       const permitMax  = Math.max(...permitVals,4000);
-      const preStabAvg = Math.round(permitVals.slice(0,6).reduce((s,v)=>s+v,0)/6);
-      const declinePct = preStabAvg ? Math.round((1-permitVals[permitVals.length-1]/preStabAvg)*100) : null;
 
       const empHist  = (a.employment?.history||[]).slice(-6);
       const empYears = empHist.length>=2 ? empHist.map(d=>d.year) : [2019,2020,2021,2022,2023,2024];
@@ -2224,7 +2222,6 @@ function renderOM() {
           <text x="${x+31}" y="${y-6}" text-anchor="middle" font-family="DM Sans" font-size="10" fill="${color}" font-weight="${stab?700:600}">${Number(v).toLocaleString()}</text>
           <text x="${x+31}" y="226" text-anchor="middle" font-family="DM Sans" font-size="10" fill="#6b7280">${permitYears[i]}${i===permitVals.length-1?' YTD':''}</text>`;
       }).join('');
-      const avgY = 210-(preStabAvg/permitMax)*180;
 
       // Employment SVG
       const span = empMax2-empMin;
@@ -2263,9 +2260,6 @@ function renderOM() {
               <rect x="-95" y="-11" width="190" height="20" fill="#c9a84c" rx="2"/>
               <text x="0" y="3" text-anchor="middle" font-family="DM Sans" font-size="9" font-weight="700" fill="#fff" letter-spacing="0.5">▼ ${rentStabDate.toUpperCase()} — RENT STABILIZATION</text>
             </g>` : ''}
-            <line x1="160" y1="${avgY}" x2="${hasRentStab?'715':'930'}" y2="${avgY}" stroke="#1e3a5f" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.55"/>
-            <text x="275" y="${avgY-6}" font-family="DM Sans" font-size="10" fill="#1e3a5f" font-style="italic" opacity="0.85">${permitYears[0]}–${permitYears[5]} avg ≈ ${Number(preStabAvg).toLocaleString()} units</text>
-            ${hasRentStab && declinePct ? `<g transform="translate(890,165)"><text x="0" y="0" text-anchor="middle" font-family="DM Sans" font-size="9" fill="#c0392b" font-weight="600">↓ ${declinePct}%</text><text x="0" y="11" text-anchor="middle" font-family="DM Sans" font-size="8" fill="#c0392b">vs. pre-stab avg</text></g>` : ''}
           </svg>
         </div>
       </div>
