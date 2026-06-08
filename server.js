@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
-const XLSX = require("xlsx");
+const ExcelJS = require("exceljs");
 const https = require("https");
 const Anthropic = require('@anthropic-ai/sdk');
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -1088,14 +1088,33 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
 
   // Excel handling
   try {
-    const wb = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true, raw: false });
+    // Magic-byte check: .xlsx files are ZIP archives and must start with PK\x03\x04
+    const magic = req.file.buffer.slice(0, 4);
+    if (magic[0] !== 0x50 || magic[1] !== 0x4B || magic[2] !== 0x03 || magic[3] !== 0x04) {
+      return res.json({ success: true, mappings: {}, summary: { note: "File does not appear to be a valid Excel file — try saving as .xlsx or .csv" } });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
     const results = {};
 
-    wb.SheetNames.forEach(name => {
-      const sheet = wb.Sheets[name];
-      if (!sheet) return;
-      let json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", blankrows: false, raw: false });
-      json = json.filter(row => row.some(c => c !== "" && c !== null));
+    workbook.eachSheet((worksheet, sheetId) => {
+      const name = worksheet.name;
+      // Convert worksheet to 2D array of strings (same shape as old XLSX output)
+      const json = [];
+      worksheet.eachRow({ includeEmpty: false }, (row) => {
+        const cells = [];
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          // Resolve formula results, dates, and plain values to strings
+          let v = cell.result ?? cell.value ?? "";
+          if (v && typeof v === "object" && v.richText) v = v.richText.map(r => r.text).join("");
+          else if (v && typeof v === "object" && v instanceof Date) v = v.toLocaleDateString();
+          else if (v && typeof v === "object") v = String(v.result ?? v.text ?? "");
+          cells.push(String(v ?? "").trim());
+        });
+        if (cells.some(c => c !== "")) json.push(cells);
+      });
+
       if (json.length === 0) return;
 
       let headerRow = 0;
@@ -1107,8 +1126,8 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
       }
 
       const headers = (json[headerRow] || []).map(h => String(h || "").trim());
-      const rows = json.slice(headerRow + 1, headerRow + 10);
-      const allRows = json.slice(headerRow + 1); // full data rows for rawRows extraction
+      const rows    = json.slice(headerRow + 1, headerRow + 10);
+      const allRows = json.slice(headerRow + 1);
       if (headers.filter(Boolean).length > 0) results[name] = { headers, rows, allRows, totalRows: json.length - headerRow - 1 };
     });
 
