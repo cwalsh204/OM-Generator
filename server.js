@@ -167,19 +167,19 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 
 Call these tools in order:
 1. Rates — Treasury yields, SOFR, Freddie Mac agency rates
-2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include multifamily share of total housing stock (mfSharePct) and its national percentile (mfSharePercentile)
+2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include: poverty rate and its national percentile (povertyRate, povertyRatePercentile); % renter-occupied housing and its national percentile (renterOccupiedPct, renterOccupiedPercentile)
 3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y); for each top sector include establishment share % (share) and location quotient / concentration ratio vs MSA avg (ratio)
 4. Residential permits — for this county/MSA; include monthly historical permit data (include_history_months: 84) so annual totals can be computed
-5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FHFA House Price Index YoY change (fhfaHPIYoY, FRED series USSTHPI or purchase-only) and its national percentile (fhfaHPIPercentile)
+5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FRED series DRTSCILM (% banks tightening CRE loan standards): latest value, its 5-year percentile (drtscilmPctile5yr), and trend direction — "tightening", "loosening", or "neutral" (drtscilmTrend)
 6. Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
 
 After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 {
   "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "termLTVBucket": string, "rateSheetSummary": string },
-  "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "mfSharePct": number|null, "mfSharePercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
+  "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "povertyRate": number|null, "povertyRatePercentile": number|null, "renterOccupiedPct": number|null, "renterOccupiedPercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
   "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "permits": { "ytd": number, "priorYear": number, "supplyPressureIndex": number, "permitPercentileRank": number, "trend": string, "annualData": [{ "year": number, "units": number }] },
-  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number, "fhfaHPIYoY": number|null, "fhfaHPIPercentile": number|null },
+  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number, "drtscilmValue": number|null, "drtscilmPctile5yr": number|null, "drtscilmTrend": string|null },
   "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
 }`;
 
@@ -952,6 +952,12 @@ app.post("/api/generate", async (req, res) => {
           population_growth:         { value: c.populationGrowth ?? c.populationGrowthPct ?? c.population_growth ?? null, national_percentile: c.populationGrowthPercentile ?? c.populationGrowthPercentileRank ?? null },
           owner_occupied:            { value: c.ownerOccupied || null },
           mf_share:                  { value: c.mfSharePct ?? null, national_percentile: c.mfSharePercentile ?? null }
+        },
+        economics: {
+          poverty_rate:            { value: c.povertyRate ?? null, national_percentile: c.povertyRatePercentile ?? null }
+        },
+        housing: {
+          pct_renter_occupied:     { value: c.renterOccupiedPct ?? c.renterPct ?? null, national_percentile: c.renterOccupiedPercentile ?? null }
         }
       };
     }
@@ -1026,6 +1032,14 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // ── Normalize economicIndicators.macroEnvironment → exact keyword ──
+    // ── Normalize DRTSCILM trend direction to lowercase keyword ──
+    if (acreData.economicIndicators?.drtscilmTrend) {
+      const t = acreData.economicIndicators.drtscilmTrend.toLowerCase().trim();
+      acreData.economicIndicators.drtscilmTrend =
+        t.includes('tighten') ? 'tightening' :
+        t.includes('loosen') ? 'loosening' : 'neutral';
+    }
+
     if (acreData.economicIndicators?.macroEnvironment) {
       const raw = acreData.economicIndicators.macroEnvironment.toLowerCase();
       if (raw === 'favorable' || raw === 'cautious' || raw === 'neutral') { /* already correct */ }

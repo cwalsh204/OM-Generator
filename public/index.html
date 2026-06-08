@@ -1998,8 +1998,8 @@ function renderOM() {
       const hhiPct = dem.median_household_income?.national_percentile ?? null;
       const bach   = parseFloat(dem.bachelor_degree_or_higher?.value) || 0;
       const bachPct= dem.bachelor_degree_or_higher?.national_percentile ?? null;
-      const popG   = dem.population_growth?.value ?? null;
-      const popGPct= dem.population_growth?.national_percentile ?? null;
+      const povertyRate    = a.census?.economics?.poverty_rate?.value ?? null;
+      const povertyRatePct = a.census?.economics?.poverty_rate?.national_percentile ?? null;
 
       const empYoY    = a.employment?.yoy_growth ?? a.employment?.qcew?.yoy_growth ?? null;
       const empYoYPct = a.employment?.yoy_growth_percentile ?? null;
@@ -2009,20 +2009,22 @@ function renderOM() {
       const spiScore  = a.permits?.supply_pressure_index?.current_score ?? null;
       const spiPct    = a.permits?.supply_pressure_index?.national_percentile ?? null;
       const permitsYTD= a.permits?.ytd_2026 ?? a.permits?.ytd_2025 ?? a.permits?.trailing_12_months?.total_units ?? null;
-      const mfShare   = a.census?.demographics?.mf_share?.value ?? null;
-      const mfSharePct= a.census?.demographics?.mf_share?.national_percentile ?? null;
+      const renterOcc    = a.census?.housing?.pct_renter_occupied?.value ?? null;
+      const renterOccPct = a.census?.housing?.pct_renter_occupied?.national_percentile ?? null;
 
       const ei        = a.economicIndicators || {};
       const macroEnv  = (ei.macroEnvironment || 'neutral').toLowerCase();
-      const fhfaHPI   = ei.fhfaHPIYoY ?? null;
-      const fhfaHPIPct= ei.fhfaHPIPercentile ?? null;
+      const drtscilmTrend = ei.drtscilmTrend   ?? null;
+      const drtscilmPct   = ei.drtscilmPctile5yr ?? null;
+      // Inverted: loosening (low tightening pct) = bar more filled
+      const drtscilmBarPct = drtscilmPct != null ? Math.max(0, 100 - drtscilmPct) : null;
       const corePCE   = ei.coreInflation ?? null;
       const corePCEPct= ei.coreInflationPercentile ?? null;
       const consConf  = ei.consumerConfidence ?? null;
       const consConfPct = ei.consumerConfidencePercentile ?? null;
 
       const allPcts = [hhiPct, bachPct, popGPct, empYoYPct,
-                       spiPct != null ? 100 - spiPct : null, fhfaHPIPct, corePCEPct, consConfPct]
+                       spiPct != null ? 100 - spiPct : null, drtscilmBarPct, corePCEPct, consConfPct]
                       .filter(v => typeof v === 'number');
       const composite = allPcts.length
         ? Math.round(allPcts.reduce((s,v) => s+v, 0) / allPcts.length)
@@ -2089,9 +2091,9 @@ function renderOM() {
             <div class="p1-bar-row">${bar(bachPct)}<div class="p1-rank">${pctTxt(bachPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Population Growth (11-Yr)</span>
-            <span class="p1-metric-val">${popG!=null ? fmtPct(popG) : '—'}</span>
-            <div class="p1-bar-row">${bar(popGPct)}<div class="p1-rank">${pctTxt(popGPct)}</div></div>
+            <span class="p1-metric-label">Poverty Rate <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-val">${povertyRate!=null ? povertyRate.toFixed(1)+'%' : '—'}</span>
+            <div class="p1-bar-row">${bar(povertyRatePct!=null ? 100-povertyRatePct : null, false)}<div class="p1-rank">${povertyRatePct!=null ? (povertyRatePct<=25?'Very low':povertyRatePct<=45?'Below avg.':povertyRatePct<=65?'Average':'Elevated') : '—'}</div></div>
           </div>
           <div class="p1-quad-takeaway">${esc(o.marketOverviewShort||capTakeaway(o.marketOverview||''))}</div>
         </div>
@@ -2135,9 +2137,9 @@ function renderOM() {
             <div class="p1-bar-row">${bar(spiPct,true)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">MF Share of Housing Stock</span>
-            <span class="p1-metric-val">${mfShare!=null ? mfShare.toFixed(1)+'%' : '—'}</span>
-            <div class="p1-bar-row">${bar(mfSharePct)}<div class="p1-rank">${pctTxt(mfSharePct)}</div></div>
+            <span class="p1-metric-label">% Renter Occupied</span>
+            <span class="p1-metric-val">${renterOcc!=null ? renterOcc.toFixed(1)+'%' : '—'}</span>
+            <div class="p1-bar-row">${bar(renterOccPct)}<div class="p1-rank">${pctTxt(renterOccPct)}</div></div>
           </div>
           <div class="p1-quad-takeaway">${esc(o.marketSupplyDemandShort||capTakeaway(o.marketSupplyDemand||''))}</div>
         </div>
@@ -2148,9 +2150,9 @@ function renderOM() {
             <div class="p1-quad-source">FRED · 27 series</div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">FHFA House Price Index (YoY)</span>
-            <span class="p1-metric-val">${fhfaHPI!=null ? fmtPct(fhfaHPI) : '—'}</span>
-            <div class="p1-bar-row">${bar(fhfaHPIPct)}<div class="p1-rank">${pctTxt(fhfaHPIPct)}</div></div>
+            <span class="p1-metric-label">CRE Loan Standards <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-val">${drtscilmTrend ? drtscilmTrend.charAt(0).toUpperCase()+drtscilmTrend.slice(1) : '—'}</span>
+            <div class="p1-bar-row">${bar(drtscilmBarPct, false)}<div class="p1-rank">${drtscilmPct!=null ? Math.round(drtscilmPct)+'th pct.' : '—'}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">Core Inflation (PCE, YoY) <span class="p1-inv-arrow">↓ better</span></span>
