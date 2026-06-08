@@ -1558,7 +1558,7 @@ function renderOM() {
               }
               return out.trim() || (text||'');
             };
-            const cap2 = text => capSentences(text, 200);
+            const cap2 = text => capSentences(text, 145);
             const addPeriod = text => text && !/[.!?]$/.test(text.trim()) ? text.trim() + '.' : text.trim();
             return `<tr style="height:120px;">
               <td style="text-align:center;font-weight:700;color:var(--om-navy);font-size:14px;vertical-align:middle;">${i+1}</td>
