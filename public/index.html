@@ -2017,7 +2017,7 @@ function renderOM() {
       const consConf  = ei.consumerConfidence ?? null;
       const consConfPct = ei.consumerConfidencePercentile ?? null;
 
-      const allPcts = [hhiPct, bachPct, popGPct, empYoYPct,
+      const allPcts = [hhiPct, bachPct, povertyRatePct != null ? 100 - povertyRatePct : null, empYoYPct,
                        spiPct != null ? 100 - spiPct : null, drtscilmBarPct, corePCEPct, consConfPct]
                       .filter(v => typeof v === 'number');
       const composite = allPcts.length
