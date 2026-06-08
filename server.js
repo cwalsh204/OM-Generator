@@ -168,7 +168,7 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 Call these tools in order:
 1. Rates — Treasury yields, SOFR, Freddie Mac agency rates
 2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include multifamily share of total housing stock (mfSharePct) and its national percentile (mfSharePercentile)
-3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y)
+3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y); for each top sector include establishment share % (share) and location quotient / concentration ratio vs MSA avg (ratio)
 4. Residential permits — for this county/MSA; include monthly historical permit data (include_history_months: 84) so annual totals can be computed
 5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FHFA House Price Index YoY change (fhfaHPIYoY, FRED series USSTHPI or purchase-only) and its national percentile (fhfaHPIPercentile)
 6. Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
@@ -177,7 +177,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 {
   "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "termLTVBucket": string, "rateSheetSummary": string },
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "mfSharePct": number|null, "mfSharePercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
-  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
+  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "permits": { "ytd": number, "priorYear": number, "supplyPressureIndex": number, "permitPercentileRank": number, "trend": string, "annualData": [{ "year": number, "units": number }] },
   "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number, "fhfaHPIYoY": number|null, "fhfaHPIPercentile": number|null },
   "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
@@ -959,6 +959,12 @@ app.post("/api/generate", async (req, res) => {
       const e = acreData.employment;
       acreData.employment = {
         laus: { unemployment_rate: e.unemploymentRate || null },
+        sectors: (e.topSectors || []).map(s => ({
+          label: s.name,
+          employment_count: s.employees,
+          share: s.share ?? null,
+          ratio: s.ratio ?? null
+        })),
         qcew: {
           top_sectors: (e.topSectors || []).map(s => ({
             sector_name:      s.name,

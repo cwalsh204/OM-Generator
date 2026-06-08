@@ -2272,26 +2272,19 @@ function renderOM() {
       <div class="p2-section" style="padding-top:10px;padding-bottom:4px;flex:1;display:flex;flex-direction:column;">
         <div class="p2-section-head">
           <div class="p2-section-title">${esc(inputs.city||'Submarket')} Employment Engine</div>
-          <div class="p2-section-sub">Total Jobs · ${empYears[0]} – ${empYears[empYears.length-1]} with Sector Mix</div>
+          <div class="p2-section-sub">Top sectors by establishment share${inputs.zip ? ` · ZIP ${esc(inputs.zip)} vs ${esc(a.county||'county')} avg` : ''}</div>
           <div class="p2-section-source">BLS QCEW · A.CRE <span class="acre-badge-light">Live</span></div>
         </div>
         <div class="p2-emp-grid">
-          <div class="p2-chart" style="height:100%;min-height:155px;">
-            <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
-              <defs><linearGradient id="empGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(201,168,76,0.35)"/><stop offset="100%" stop-color="rgba(201,168,76,0.02)"/></linearGradient></defs>
-              <g font-family="DM Sans" font-size="9" fill="#6b7280">
-                ${[0,1,2,3,4].map(i=>{const y=24+i*36.5;const v=empMax2-(empMax2-empMin)*(i/4);return `<line x1="56" y1="${y}" x2="580" y2="${y}" stroke="${i===4?'#0a1628':'#e5e7eb'}" stroke-width="${i===4?1:0.5}"/><text x="50" y="${y+4}" text-anchor="end">${(v/1000).toFixed(0)}K</text>`;}).join('')}
-              </g>
-              <path d="${empArea}" fill="url(#empGrad)" opacity="0.85"/>
-              <path d="${empPath}" stroke="#c9a84c" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-              <g fill="#c9a84c" stroke="#fff" stroke-width="2">${xs.map((x,i)=>`<circle cx="${x}" cy="${ys[i]}" r="${i===xs.length-1?5:4}"/>`).join('')}</g>
-              <g font-family="DM Sans" font-size="10" font-weight="700">
-                <text x="${xs[0]}" y="${ys[0]+14}" text-anchor="middle" fill="#6b7280">${Number(empVals[0]).toLocaleString()}</text>
-                <text x="${xs[xs.length-1]}" y="${ys[ys.length-1]-10}" text-anchor="middle" fill="#0a1628">${Number(empVals[empVals.length-1]).toLocaleString()}</text>
-              </g>
-              <g font-family="DM Sans" font-size="10" fill="#6b7280">${xs.map((x,i)=>`<text x="${x}" y="187" text-anchor="middle">${empYears[i]}</text>`).join('')}</g>
-              ${empCAGR!=null?`<g transform="translate(385,55)"><rect x="0" y="0" width="155" height="34" fill="rgba(10,22,40,0.92)" rx="3"/><text x="78" y="14" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="#c9a84c">${empCAGR>0?'+':''}${empCAGR}% (${empVals.length-1}-Yr)</text><text x="78" y="27" text-anchor="middle" font-family="DM Sans" font-size="9" fill="#fff">${empYoY!=null?fmtPct(empYoY)+' YoY':''}</text></g>`:''}
-            </svg>
+          <div class="p2-chart" style="height:100%;min-height:155px;display:flex;flex-direction:column;gap:6px;">
+            <div style="flex:1;min-height:0;position:relative;">
+              <canvas id="chart-emp-concentration"></canvas>
+            </div>
+            <div style="display:flex;gap:14px;padding-left:4px;flex-shrink:0;">
+              <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#1D9E75;display:inline-block;"></span>2×+ county avg</span>
+              <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#378ADD;display:inline-block;"></span>1.2–2× county avg</span>
+              <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.22);border:1px solid #6b7280;display:inline-block;"></span>Below avg</span>
+            </div>
           </div>
           <div class="p2-sectors">
             <div class="p2-sectors-head">Top Employment Sectors · ${empYears[empYears.length-1]}</div>
@@ -2663,6 +2656,63 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
     if (chartsRegistry[id]) { try { chartsRegistry[id].destroy(); } catch(e) {} }
     chartsRegistry[id] = new Chart(el, config);
   };
+
+  // ── Employment concentration horizontal bar chart ────────────────
+  (() => {
+    const rawSectors = (a.employment?.sectors || []).filter(s => s.share != null);
+    if (!rawSectors.length) return;
+    const sectors = rawSectors.sort((x, y) => (y.share||0) - (x.share||0)).slice(0, 5);
+    const barColors = sectors.map(s =>
+      (s.ratio||0) >= 2.0 ? '#1D9E75' :
+      (s.ratio||0) >= 1.2 ? '#378ADD' :
+      'rgba(255,255,255,0.22)'
+    );
+    const xMax = Math.ceil(Math.max(...sectors.map(s => s.share||0), 5) / 5) * 5 + 5;
+    const _cleanSectorLabel = n => (n||'')
+      .replace(/\s*\(NAICS[^)]*\)/gi,'').replace(/ and Waste Management.*/i,'')
+      .replace(/ and Technical Services/i,' & Technical').replace(/ Services$/i,'').trim();
+    makeChart('chart-emp-concentration', {
+      type: 'bar',
+      data: {
+        labels: sectors.map(s => _cleanSectorLabel(s.label)),
+        datasets: [{
+          data: sectors.map(s => parseFloat((s.share||0).toFixed(1))),
+          backgroundColor: barColors,
+          borderRadius: 3,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const s = sectors[ctx.dataIndex];
+                const lines = [` Share: ${(s.share||0).toFixed(1)}% of establishments`];
+                if (s.ratio != null) lines.push(` Concentration: ${(s.ratio).toFixed(2)}× county avg`);
+                return lines;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            max: xMax,
+            grid: { color: 'rgba(255,255,255,0.07)' },
+            ticks: { color: '#8FA8C0', font: { size: 10 }, callback: v => v + '%' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: '#0a1628', font: { size: 10 } }
+          }
+        }
+      }
+    });
+  })();
 
   // ── Inline datalabels plugin (no external CDN needed) ─────────────
   const safeNum = (val) => { const n = parseFloat(val); return isNaN(n) ? 0 : n; };
