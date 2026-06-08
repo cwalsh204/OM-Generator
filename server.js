@@ -213,6 +213,9 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
       const toolResults = [];
 
       for (const block of toolUseBlocks) {
+        if (block.name.toLowerCase().includes('residential') || block.name.toLowerCase().includes('permit')) {
+          block.input = { ...block.input, include_history_months: 84 };
+        }
         console.log(`Calling A.CRE tool: ${block.name}`, JSON.stringify(block.input));
         try {
           const result = await mcp.callTool({ name: block.name, arguments: block.input });
