@@ -2482,13 +2482,10 @@ function renderOM() {
             <div class="a-quote-meta">${esc(_quoteMeta)}</div>
           </div>
           <div class="a-mini-stats">
-            <div class="a-mini"><div class="a-mini-label">Freddie MF delinquency</div><div class="a-mini-val${a.rates?.freddieMFDelinquency != null && a.rates.freddieMFDelinquency < 3 ? ' pos' : ''}">${fredDelinq}</div></div>
-            <div class="a-mini"><div class="a-mini-label">Fannie MF delinquency</div><div class="a-mini-val${a.rates?.fannieMFDelinquency != null && a.rates.fannieMFDelinquency < 3 ? ' pos' : ''}">${fanDelinq}</div></div>
             <div class="a-mini"><div class="a-mini-label">CRE lending YoY</div><div class="a-mini-val${ei.creLendingYoY != null ? (ei.creLendingYoY >= 0 ? ' pos' : ' neg') : ''}">${cre_yoy}</div></div>
             <div class="a-mini"><div class="a-mini-label">Credit conditions</div><div class="a-mini-val">${esc(creditLbl)}</div></div>
             <div class="a-mini"><div class="a-mini-label">5Y UST</div><div class="a-mini-val">${t5disp}</div></div>
           </div>
-          ${delinqPeriod ? `<div class="a-delinq-note"><em>Delinquency rates as of ${esc(delinqPeriod)}</em></div>` : ''}
         </div>
       </div>`;
     })()}
