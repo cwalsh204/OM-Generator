@@ -262,6 +262,62 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
   }
 }
 
+// ─── GEO MATH HELPERS ─────────────────────────────────────────────────────────
+function calcBearing(lat1, lng1, lat2, lng2) {
+  const φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
+  const Δλ = (lng2-lng1)*Math.PI/180;
+  const y = Math.sin(Δλ)*Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360; // degrees from North, clockwise
+}
+function calcDistance(lat1, lng1, lat2, lng2) {
+  const R = 3958.8; // miles
+  const φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
+  const Δφ = (lat2-lat1)*Math.PI/180, Δλ = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ─── GEOCODE MAP DOTS (Google Geocoding + Places Text Search) ─────────────────
+async function geocodeMapDots(address, city, state, destinations) {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey || !destinations.length) return null;
+  try {
+    // Step 1: geocode the property center
+    const geoResp = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(`${address}, ${city}, ${state}`)}&key=${apiKey}`
+    );
+    const geoData = await geoResp.json();
+    if (geoData.status !== 'OK' || !geoData.results.length) {
+      console.warn('Property geocoding failed:', geoData.status); return null;
+    }
+    const center = geoData.results[0].geometry.location;
+    console.log(`Property geocoded: ${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`);
+
+    // Step 2: Places Text Search for each destination (parallel)
+    const results = await Promise.all(destinations.slice(0,8).map(async dest => {
+      try {
+        const r = await fetch(
+          `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${dest.name} ${city} ${state}`)}&location=${center.lat},${center.lng}&radius=25000&key=${apiKey}`
+        );
+        const d = await r.json();
+        if (d.status !== 'OK' || !d.results.length) return null;
+        const loc = d.results[0].geometry.location;
+        const bearing  = calcBearing(center.lat, center.lng, loc.lat, loc.lng);
+        const distMi   = calcDistance(center.lat, center.lng, loc.lat, loc.lng);
+        console.log(`  Geocoded "${dest.name}": ${distMi.toFixed(2)} mi, ${bearing.toFixed(0)}°`);
+        return { name: dest.name, category: dest.category, angleDeg: Math.round(bearing*10)/10, distanceMiles: Math.round(distMi*10)/10 };
+      } catch(e) { console.warn(`Places lookup failed for ${dest.name}:`, e.message); return null; }
+    }));
+
+    const dots = results.filter(Boolean);
+    console.log(`Geocoded ${dots.length}/${destinations.length} map destinations`);
+    return { dots };
+  } catch(e) {
+    console.warn('geocodeMapDots failed:', e.message); return null;
+  }
+}
+
 // ─── COUNTY INFERENCE ─────────────────────────────────────────────────────────
 function inferCountyAndMSA(inputs) {
   const city = (inputs.city || "").toLowerCase();
@@ -950,6 +1006,30 @@ app.post("/api/generate", async (req, res) => {
     const _webVacancy = webFallbacks.webData?.multifamilyMarket?.vacancyRatePct
       ?? webFallbacks.haikusData?.multifamilyMarket?.vacancyRatePct
       ?? null;
+
+    // ── Geocode map dots for accurate location map ────────────────────────────
+    const _mapDestinations = [
+      ...(Array.isArray(omContent.locationRetail)        ? omContent.locationRetail.slice(0,3).map(d=>({name:d.name,category:'retail'}))   : []),
+      ...(Array.isArray(omContent.locationMajorEmployers)? omContent.locationMajorEmployers.slice(0,3).map(d=>({name:d.name,category:'employer'})) : []),
+      ...(Array.isArray(omContent.locationTransit)       ? omContent.locationTransit.slice(0,2).map(d=>({name:d.name,category:'transit'}))  : []),
+      ...(Array.isArray(omContent.locationEducation)     ? omContent.locationEducation.slice(0,2).map(d=>({name:d.name,category:'education'})): []),
+    ].filter(d => d.name);
+
+    const _mapCacheKey = `mapDots:${(inputs.address||'').toLowerCase().trim()}|${(inputs.city||'').toLowerCase().trim()}|${(inputs.state||'').toLowerCase().trim()}`;
+    let _mapDots = null;
+    try {
+      if (redis) { _mapDots = await redis.get(_mapCacheKey); if (_mapDots) console.log('Map dots: Redis cache hit'); }
+    } catch(e) { console.warn('Map dots cache read failed:', e.message); }
+
+    if (!_mapDots && _mapDestinations.length > 0) {
+      _mapDots = await geocodeMapDots(inputs.address, inputs.city, inputs.state, _mapDestinations);
+      if (_mapDots) {
+        try {
+          if (redis) { await redis.set(_mapCacheKey, _mapDots, { ex: 604800 }); console.log('Map dots cached (7-day TTL)'); }
+        } catch(e) { console.warn('Map dots cache write failed:', e.message); }
+      }
+    }
+    omContent._mapDots = _mapDots || null;
 
     // Attach A.CRE data for renderer
     omContent._acreData = {

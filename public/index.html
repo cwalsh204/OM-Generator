@@ -1734,18 +1734,37 @@ function renderOM() {
           const _empMatches = [...(_empText.matchAll(/([A-Z][A-Za-z &'.,-]{2,40})\s*[\(–-]\s*([\d,.]+[KkMm]?)\s*(?:people|employees|jobs|workers)?/g))];
           _empMatches.slice(0, 8).forEach((m, i) => dots.push({ name: _truncMapLabel(m[1].trim().split(/[,]/)[0]), ring: i < 2 ? 5 : i < 5 ? 10 : 15 }));
         }
-        // De-duplicate by name, cap at 8, assign idx for angle
+        // De-duplicate by name, cap at 8
         const seen = new Set();
-        return dots.filter(d => { if (!d.name || seen.has(d.name)) return false; seen.add(d.name); return true; })
-          .slice(0, 8).map((d, i) => ({ ...d, idx: i }));
+        const deduped = dots.filter(d => { if (!d.name || seen.has(d.name)) return false; seen.add(d.name); return true; }).slice(0, 8);
+
+        // ── Merge geocoded positions if available ──
+        if (o._mapDots && Array.isArray(o._mapDots.dots)) {
+          const geoMap = {};
+          o._mapDots.dots.forEach(g => { geoMap[g.name] = g; });
+          deduped.forEach(d => {
+            const geo = geoMap[d.name];
+            if (geo) {
+              d.angleDeg     = geo.angleDeg;
+              d.distanceMiles= geo.distanceMiles;
+              // Override ring based on actual distance
+              d.ring = geo.distanceMiles < 0.75 ? 5 : geo.distanceMiles < 2.5 ? 10 : 15;
+            }
+          });
+        }
+        return deduped.map((d, i) => ({ ...d, idx: i }));
       };
       const _destinations = _buildMapDots();
       const _ringR = { 5: 78, 10: 175, 15: 270 };
       const _ringFill = { 5: '#c9a84c', 10: '#1e3a5f', 15: '#4a90d9' };
       const _cx = 350, _cy = 330;
-      const _dotsSVG = _destinations.map(d => {
-        const angle = (d.idx / Math.max(_destinations.length, 1)) * 2 * Math.PI - Math.PI/2;
-        const r = _ringR[d.ring];
+      const _hasGeo = o._mapDots && Array.isArray(o._mapDots.dots) && o._mapDots.dots.length > 0;
+      const _dotsSVG = _destinations.map((d, i) => {
+        // Real bearing angle if geocoded; otherwise evenly spaced fallback
+        const angle = d.angleDeg != null
+          ? (d.angleDeg - 90) * Math.PI / 180
+          : (i / Math.max(_destinations.length, 1)) * 2 * Math.PI - Math.PI/2;
+        const r = _ringR[d.ring] || 175;
         const px = _cx + r * Math.cos(angle);
         const py = _cy + r * Math.sin(angle);
         const labelX = px > _cx ? px + 8 : px - 8;
@@ -1756,7 +1775,7 @@ function renderOM() {
       return `
       <div class="loc-iso-body">
         <div class="loc-iso-map">
-          <div class="loc-iso-map-title">Drive-Time Reach — ${esc(fullAddress)}</div>
+          <div class="loc-iso-map-title">Drive-Time Reach — ${esc(fullAddress)}${_hasGeo ? '' : ' <span style="font-size:8px;opacity:0.5;font-style:italic;">schematic</span>'}</div>
           <svg viewBox="0 0 700 660" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="locIsoBg" x1="0" y1="0" x2="0" y2="1">
