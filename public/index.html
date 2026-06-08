@@ -1760,18 +1760,60 @@ function renderOM() {
       const _ringFill = { 5: '#c9a84c', 10: '#1e3a5f', 15: '#4a90d9' };
       const _cx = 350, _cy = 330;
       const _hasGeo = o._mapDots && Array.isArray(o._mapDots.dots) && o._mapDots.dots.length > 0;
-      const _dotsSVG = _destinations.map((d, i) => {
-        // Real bearing angle if geocoded; otherwise evenly spaced fallback
-        const angle = d.angleDeg != null
-          ? (d.angleDeg - 90) * Math.PI / 180
-          : (i / Math.max(_destinations.length, 1)) * 2 * Math.PI - Math.PI/2;
-        const r = _ringR[d.ring] || 175;
-        const px = _cx + r * Math.cos(angle);
-        const py = _cy + r * Math.sin(angle);
-        const labelX = px > _cx ? px + 8 : px - 8;
-        const anchor = px > _cx ? 'start' : 'end';
-        return `<circle cx="${px.toFixed(0)}" cy="${py.toFixed(0)}" r="5" fill="${_ringFill[d.ring]}" stroke="#fff" stroke-width="1.5"/><text x="${labelX.toFixed(0)}" y="${(py+3).toFixed(0)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}">${esc(d.name)}</text>`;
-      }).join('');
+      const _dotsSVG = (() => {
+        const SVG_W = 700, SVG_H = 660, PAD = 14;
+        const placed = []; // track label centres for collision detection
+        return _destinations.map((d, i) => {
+          const angle = d.angleDeg != null
+            ? (d.angleDeg - 90) * Math.PI / 180
+            : (i / Math.max(_destinations.length, 1)) * 2 * Math.PI - Math.PI/2;
+          const r = _ringR[d.ring] || 175;
+          const px = _cx + r * Math.cos(angle);
+          const py = _cy + r * Math.sin(angle);
+          const estW = d.name.length * 6.2; // approximate text width
+
+          // ── Label placement: side for central dots, above/below for edge dots ──
+          let lx, ly, anchor;
+          const nearLeft  = px < 130;
+          const nearRight = px > SVG_W - 130;
+          const nearTop   = py < 80;
+
+          if (nearLeft || nearRight) {
+            // Too close to left/right edge — place label above or below the dot
+            anchor = 'middle';
+            lx = Math.max(PAD + estW / 2, Math.min(SVG_W - PAD - estW / 2, px));
+            ly = (py > _cy) ? py - 12 : py + 18; // above if lower half, below if upper
+          } else if (nearTop) {
+            anchor = 'middle';
+            lx = Math.max(PAD + estW / 2, Math.min(SVG_W - PAD - estW / 2, px));
+            ly = py + 16;
+          } else {
+            anchor = px >= _cx ? 'start' : 'end';
+            lx = px >= _cx ? px + 8 : px - 8;
+            ly = py + 4;
+          }
+
+          // ── Clamp label within SVG bounds ──
+          if (anchor === 'start')  lx = Math.min(lx, SVG_W - estW - PAD);
+          if (anchor === 'end')    lx = Math.max(lx, estW + PAD);
+          if (anchor === 'middle') lx = Math.max(PAD + estW / 2, Math.min(SVG_W - PAD - estW / 2, lx));
+          ly = Math.max(PAD + 10, Math.min(SVG_H - PAD, ly));
+
+          // ── Collision nudge: push label down if too close to a placed label ──
+          let attempts = 0;
+          while (attempts < 6) {
+            const clash = placed.some(p => Math.abs(lx - p.x) < 75 && Math.abs(ly - p.y) < 13);
+            if (!clash) break;
+            ly += 13;
+            ly = Math.min(SVG_H - PAD, ly);
+            attempts++;
+          }
+          placed.push({ x: lx, y: ly });
+
+          return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${_ringFill[d.ring]}" stroke="#fff" stroke-width="1.5"/>`
+               + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}">${esc(d.name)}</text>`;
+        }).join('');
+      })();
 
       return `
       <div class="loc-iso-body">
