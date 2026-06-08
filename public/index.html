@@ -1365,7 +1365,7 @@ function renderOM() {
         </div>`;
 
         const _narrativeBlock = `
-        <p class="fin-narrative">${esc(o.financingNarrative||'')}${o.financingNarrative && o.financingRateContext ? ' ' : ''}${esc(o.financingRateContext||'')}</p>
+        <p class="fin-narrative">${esc(o.financingNarrative||o.financingRateContext||'')}</p>
         <p class="om-source">Rate data: A.CRE Intelligence Hub — FRED, CME, Freddie Mac. Indicative only.</p>`;
 
         return _heroBlock + _stackBlock + _mathBlock + _termsBlock + _narrativeBlock;

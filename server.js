@@ -1105,12 +1105,18 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
       worksheet.eachRow({ includeEmpty: false }, (row) => {
         const cells = [];
         row.eachCell({ includeEmpty: true }, (cell) => {
-          // Resolve formula results, dates, and plain values to strings
-          let v = cell.result ?? cell.value ?? "";
-          if (v && typeof v === "object" && v.richText) v = v.richText.map(r => r.text).join("");
-          else if (v && typeof v === "object" && v instanceof Date) v = v.toLocaleDateString();
-          else if (v && typeof v === "object") v = String(v.result ?? v.text ?? "");
-          cells.push(String(v ?? "").trim());
+          // cell.text returns the formatted display value (e.g. "$1,234") matching
+          // xlsx raw:false behaviour — critical for Claude to recognise currency values
+          let v = cell.text ?? "";
+          if (!v && cell.value != null) {
+            // Fallback for edge cases where cell.text is empty
+            const raw = cell.result ?? cell.value;
+            if (raw && typeof raw === "object" && raw.richText) v = raw.richText.map(r => r.text).join("");
+            else if (raw instanceof Date) v = raw.toLocaleDateString();
+            else if (raw && typeof raw === "object") v = String(raw.result ?? raw.text ?? "");
+            else v = String(raw ?? "");
+          }
+          cells.push(v.trim());
         });
         if (cells.some(c => c !== "")) json.push(cells);
       });
@@ -1269,8 +1275,7 @@ Score each risk:
 Return JSON with these exact keys:
 - tagline (8-12 words)
 - executiveSummary (4-5 sentences — cite specific rates and market figures from data)
-- financingNarrative (3 sentences — reference actual current Treasury yields)
-- financingRateContext (2-3 sentences — "As of today the 10Y Treasury is at X%..." cite A.CRE data)
+- financingNarrative (exactly 3-4 sentences total — combine the loan rationale and rate context into one cohesive paragraph. Sentence 1: state the loan request, execution type, and why the deal qualifies. Sentence 2: cite the current 10Y Treasury rate and agency spread range from A.CRE data to frame the all-in rate. Sentence 3: position the asset's credit profile relative to lender appetite. Sentence 4 (optional): one forward-looking sentence on rate environment or hold strategy. Do NOT repeat any figure already shown in the structured metrics above — no restating LTV, debt yield, or loan amount verbatim. Do NOT generate financingRateContext as a separate field.)
 - agencyRateSheetNarrative (2 sentences — reference actual Freddie Mac spread data)
 - investmentHighlights (array of 6 strings — each must start with a SHORT 2-4 word punchy headline in title case, followed by " — " and then 2-3 sentences of supporting detail. Example format: "Top-Decile Demographics — Bethesda's median HHI of $192K ranks in the 97th national percentile...". Headlines must be eye-catching and specific, NOT full sentences or data strings.)
 - risksAndMitigants (array of 5-6 objects: risk, mitigant, likelihood, likelihoodTier, severity, severityTier, priority, priorityLabel, priorityColor, trajectory, trajectoryLabel, evidence, underwrtingAdj)
