@@ -1252,10 +1252,10 @@ async function mapColumns(res, fileType, headers, rows, allRows) {
         role: "user",
         content: `Map columns for a "${fileType}" CRE spreadsheet.
 Headers: ${JSON.stringify(headers.slice(0, 20))}
-Sample rows: ${JSON.stringify(rows.slice(0, 5))}
+Sample rows: ${JSON.stringify(rows.slice(0, 8))}
 Return: {"mappings":{"standardField":"actualColumnHeader"},"summary":{"Label":"$value"}}
 For t12: find EGI, vacancy, opex, NOI, management, taxes, insurance, maintenance.
-For rentRoll: find unit, type, SF, in-place rent, market rent, lease dates, status. Always include the average in-place/leased rent from the totals row in the summary (the column may be labeled "Average Leased", "Average In Place Rent", "Avg Rent", or similar — not market rent).
+For rentRoll: find unit, type, SF, in-place rent, market rent, lease dates, status.
 For proForma: find EGI, vacancy, NOI, expenses, stabilized NOI, years.
 Summary: up to 8 key financial figures with formatted values.`
       }]
@@ -1264,6 +1264,31 @@ Summary: up to 8 key financial figures with formatted values.`
     const text = (result.body.content || []).find(c => c.type === "text")?.text || "{}";
     const parsed = extractJSON(text);
     console.log(`Column mapping success. Mappings: ${Object.keys(parsed.mappings || {}).length}`);
+
+    // ── For rent roll: extract exact average leased rent from totals row in code (no Claude inference) ──
+    if (fileType === 'rentRoll' && allRows && headers) {
+      // Find column index whose header matches average leased/in-place rent variations
+      const rentColIdx = headers.findIndex(h =>
+        /avg(erage)?\s*(leased|in.?place|current|actual)\s*rent/i.test(h) ||
+        /in.?place\s*rent/i.test(h) ||
+        /leased\s*(rent|amt)/i.test(h) ||
+        /avg\s*rent/i.test(h)
+      );
+      // Find the last totals/averages row
+      const totalsRow = [...allRows].reverse().find(r =>
+        /^(total|totals|average|averages|totals\s*\/\s*averages|grand\s*total|all\s*units|overall)$/i.test(String(r[0]||'').trim())
+      );
+      if (rentColIdx >= 0 && totalsRow) {
+        const raw = String(totalsRow[rentColIdx] || '').replace(/[$,\s]/g, '');
+        const val = parseFloat(raw);
+        if (!isNaN(val) && val > 100) {
+          parsed.summary = parsed.summary || {};
+          parsed.summary['Average Rent'] = `$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+          console.log(`Rent roll: extracted exact avg leased rent = $${val} from col ${rentColIdx} ("${headers[rentColIdx]}")`);
+        }
+      }
+    }
+
     res.json({ success: true, mappings: parsed.mappings || {}, summary: parsed.summary || {}, rawRows });
   } catch (err) {
     console.error("Column mapping error:", err.message);
