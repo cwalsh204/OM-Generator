@@ -2242,9 +2242,16 @@ function renderOM() {
             ${topSectors.slice(0,5).map((s,i)=>{
               const cnt=s.employment_count||0;
               const w=Math.round((cnt/topMax)*100);
+              const _cleanSector = n => (n||'')
+                .replace(/\s*\(NAICS[^)]*\)/gi,'')
+                .replace(/\s*\([A-Z]\d+\)/g,'')
+                .replace(/ and Waste Management and Remediation Services/i,'')
+                .replace(/ and Technical Services/i,' & Technical')
+                .replace(/ Services$/i,'')
+                .trim();
               return `<div class="p2-sector-row">
                 <div class="p2-sector-rank">${i+1}</div>
-                <div class="p2-sector-name">${esc((s.sector_name||'').substring(0,24))}</div>
+                <div class="p2-sector-name" title="${esc(s.sector_name||'')}">${esc(_cleanSector(s.sector_name))}</div>
                 <div class="p2-sector-val">${Number(cnt).toLocaleString()}</div>
                 <div class="p2-sector-bar-wrap"><div class="p2-sector-bar-fill" style="width:${w}%"></div></div>
               </div>`;
@@ -2672,7 +2679,7 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
   const _locEmpSectors = (() => {
     // Prefer A.CRE topSectors; fall back to parsing locationEmployers text
     const acreTop = (a.employment?.topSectors || []).slice(0,5).map(s => ({
-      label: (s.name || s.sector_name || '').replace(/[&]/g,'&').substring(0,28),
+      label: (s.name || s.sector_name || '').replace(/[&]/g,'&').replace(/\s*\(NAICS[^)]*\)/gi,'').replace(/\s*\([A-Z]\d+\)/g,'').replace(/ and Waste Management and Remediation Services/i,'').replace(/ and Technical Services/i,' & Technical').replace(/ Services$/i,'').trim(),
       count: s.employees || s.employment_count || 0
     })).filter(e => e.count > 0);
     if (acreTop.length >= 2) return acreTop;
