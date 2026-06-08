@@ -166,7 +166,7 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
     const userPrompt = `Fetch A.CRE Intelligence Hub data for: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}${county ? ` (County: ${county}` : ''}${msa ? `, MSA: ${msa}` : ''}${county || msa ? ')' : ''}.
 
 Call these tools in order:
-1. Rates — Treasury yields, SOFR, Freddie Mac agency rates, agency MF delinquency rate
+1. Rates — Treasury yields, SOFR, Freddie Mac agency rates
 2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include multifamily share of total housing stock (mfSharePct) and its national percentile (mfSharePercentile)
 3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y)
 4. Residential permits — for this county
@@ -175,7 +175,7 @@ Call these tools in order:
 
 After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 {
-  "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "delinquencyRate": number, "termLTVBucket": string, "rateSheetSummary": string },
+  "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "termLTVBucket": string, "rateSheetSummary": string },
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "mfSharePct": number|null, "mfSharePercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
   "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "permits": { "ytd": number, "priorYear": number, "supplyPressureIndex": number, "permitPercentileRank": number, "trend": string, "annualData": [{ "year": number, "units": number }] },
@@ -450,6 +450,8 @@ Search queries to run:
 - "10 year treasury yield today"
 - "SOFR rate today"
 - "Freddie Mac multifamily rates 2026"
+- "Freddie Mac multifamily serious delinquency rate Q4 2025 quarterly"
+- "Fannie Mae multifamily delinquency rate Q4 2025 quarterly supplement"
 - "${inputs.city} ${inputs.state} major employers 2025"
 - "${inputs.city} Class A apartment rent comps 2025"
 - "${acreData.county} rent stabilization rent control 2024 2025"
@@ -464,6 +466,11 @@ Return this exact JSON structure with real numbers only:
     "treasury_5y": number|null,
     "sofr": number|null,
     "freddieMFRate": number|null
+  },
+  "agencyDelinquency": {
+    "freddie": number|null,
+    "fannie": number|null,
+    "period": string|null
   },
   "demographics": {
     "medianHouseholdIncome": number|null,
@@ -696,8 +703,8 @@ function buildDataContext(acreData, webFallbacks, inputs) {
 
   // A.CRE Rates (flat structure from MCP)
   if (acreData.rates && acreData.sources?.rates !== "fallback_needed") {
-    const { treasury_10y: t10, treasury_5y: t5, sofr, agencySpread, delinquencyRate, termLTVBucket } = acreData.rates;
-    if (t10) lines.push(`RATES [A.CRE LIVE]: 10Y Treasury: ${t10}%, 5Y: ${t5 || "N/A"}%, SOFR: ${sofr || "N/A"}%, Agency Spread: ${agencySpread || "N/A"}bps, MF Delinquency: ${delinquencyRate || "N/A"}%`);
+    const { treasury_10y: t10, treasury_5y: t5, sofr, agencySpread, termLTVBucket } = acreData.rates;
+    if (t10) lines.push(`RATES [A.CRE LIVE]: 10Y Treasury: ${t10}%, 5Y: ${t5 || "N/A"}%, SOFR: ${sofr || "N/A"}%, Agency Spread: ${agencySpread || "N/A"}bps`);
   }
 
   // A.CRE Rate Sheet narrative
@@ -917,9 +924,11 @@ app.post("/api/generate", async (req, res) => {
       treasury_5y:     acreT5    || wr.treasury_5y   || null,
       sofr:            acreSofr  || wr.sofr           || null,
       freddieMFRate:   _rateNum(acreData.rates?.freddieMFRate) || wr.freddieMFRate || null,
-      agencySpread:    acreData.rates?.agencySpread   || null,
-      delinquencyRate: acreData.rates?.delinquencyRate || null,
-      termLTVBucket:   acreData.rates?.termLTVBucket  || "10yr/65%"
+      agencySpread:         acreData.rates?.agencySpread   || null,
+      termLTVBucket:        acreData.rates?.termLTVBucket  || "10yr/65%",
+      freddieMFDelinquency: webFallbacks.webData?.agencyDelinquency?.freddie ?? null,
+      fannieMFDelinquency:  webFallbacks.webData?.agencyDelinquency?.fannie  ?? null,
+      delinquencyPeriod:    webFallbacks.webData?.agencyDelinquency?.period  ?? null
     };
 
     // rateSources: "live" | "websearch" | "fallback" — used by frontend for badges

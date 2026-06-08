@@ -660,6 +660,7 @@
   .a-mini-val { font-family:'Cormorant Garamond',serif; font-size:17px; font-weight:700; color:var(--om-navy); white-space:nowrap; }
   .a-mini-val.pos { color:#2d7a3a; }
   .a-mini-val.neg { color:#c0392b; }
+  .a-delinq-note { font-size:9px; color:var(--om-gray); padding-top:7px; line-height:1.4; }
 
   /* Sponsor — Option B Profile Card */
   .sp-logo-box { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#fff; border:1px solid var(--om-border); border-radius:8px; width:100%; height:148px; }
@@ -2396,7 +2397,9 @@ function renderOM() {
         : `${spreadBps} bps spread over 10Y UST · indicative only.`;
 
       // ── Mini stats ──
-      const delinq    = a.rates?.delinquencyRate != null ? Number(a.rates.delinquencyRate).toFixed(2) + '%' : '—';
+      const fredDelinq   = a.rates?.freddieMFDelinquency != null ? Number(a.rates.freddieMFDelinquency).toFixed(2) + '%' : '—';
+      const fanDelinq    = a.rates?.fannieMFDelinquency  != null ? Number(a.rates.fannieMFDelinquency).toFixed(2)  + '%' : '—';
+      const delinqPeriod = a.rates?.delinquencyPeriod    || null;
       const cre_yoy   = ei.creLendingYoY   != null ? (ei.creLendingYoY > 0 ? '+' : '') + Number(ei.creLendingYoY).toFixed(1) + '%' : '—';
       const creditLbl = (() => {
         const raw = (ei.creditConditionsLabel || '').trim();
@@ -2494,11 +2497,13 @@ function renderOM() {
             <div class="a-quote-meta">${esc(_quoteMeta)}</div>
           </div>
           <div class="a-mini-stats">
-            <div class="a-mini"><div class="a-mini-label">Agency MF delinquency</div><div class="a-mini-val${a.rates?.delinquencyRate != null && a.rates.delinquencyRate < 3 ? ' pos' : ''}">${delinq}</div></div>
+            <div class="a-mini"><div class="a-mini-label">Freddie MF delinquency</div><div class="a-mini-val${a.rates?.freddieMFDelinquency != null && a.rates.freddieMFDelinquency < 3 ? ' pos' : ''}">${fredDelinq}</div></div>
+            <div class="a-mini"><div class="a-mini-label">Fannie MF delinquency</div><div class="a-mini-val${a.rates?.fannieMFDelinquency != null && a.rates.fannieMFDelinquency < 3 ? ' pos' : ''}">${fanDelinq}</div></div>
             <div class="a-mini"><div class="a-mini-label">CRE lending YoY</div><div class="a-mini-val${ei.creLendingYoY != null ? (ei.creLendingYoY >= 0 ? ' pos' : ' neg') : ''}">${cre_yoy}</div></div>
             <div class="a-mini"><div class="a-mini-label">Credit conditions</div><div class="a-mini-val">${esc(creditLbl)}</div></div>
             <div class="a-mini"><div class="a-mini-label">5Y UST</div><div class="a-mini-val">${t5disp}</div></div>
           </div>
+          ${delinqPeriod ? `<div class="a-delinq-note"><em>Delinquency rates as of ${esc(delinqPeriod)}</em></div>` : ''}
         </div>
       </div>`;
     })()}
