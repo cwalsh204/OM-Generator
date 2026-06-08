@@ -2087,7 +2087,7 @@ function renderOM() {
             <div class="p1-bar-row">${bar(bachPct)}<div class="p1-rank">${pctTxt(bachPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Poverty Rate <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-label">Poverty Rate</span>
             <span class="p1-metric-val">${povertyRate!=null ? povertyRate.toFixed(1)+'%' : '—'}</span>
             <div class="p1-bar-row">${bar(povertyRatePct)}<div class="p1-rank">${povertyRatePct!=null ? (povertyRatePct<=25?'Very low':povertyRatePct<=45?'Below avg.':povertyRatePct<=65?'Average':'Elevated') : '—'}</div></div>
           </div>
@@ -2105,7 +2105,7 @@ function renderOM() {
             <div class="p1-bar-row">${bar(empYoYPct)}<div class="p1-rank">${pctTxt(empYoYPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">ZIP Unemployment Rate <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-label">ZIP Unemployment Rate</span>
             <span class="p1-metric-val">${zipUnemp!=null ? zipUnemp.toFixed(1)+'%' : '—'}</span>
             <div class="p1-bar-row">${bar(zipUnemp!=null ? Math.min(100,Math.round(zipUnemp*10)) : null)}<div class="p1-rank">${zipUnemp!=null ? (zipUnemp<=3?'Very low':zipUnemp<=5?'Below avg.':zipUnemp<=7?'Average':'Elevated') : '—'}</div></div>
           </div>
@@ -2123,12 +2123,12 @@ function renderOM() {
             <div class="p1-quad-source">Census BPS · A.CRE</div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Permits YTD <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-label">Permits YTD</span>
             <span class="p1-metric-val">${permitsYTD != null ? Number(permitsYTD).toLocaleString() : '—'}</span>
             <div class="p1-bar-row">${bar(spiPct)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Supply Pressure Index <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-label">Supply Pressure Index</span>
             <span class="p1-metric-val">${spiScore!=null?`${spiScore}&thinsp;/&thinsp;100`:'—'}</span>
             <div class="p1-bar-row">${bar(spiPct)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
@@ -2146,12 +2146,12 @@ function renderOM() {
             <div class="p1-quad-source">FRED · 27 series</div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">CRE Loan Standards <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-label">CRE Loan Standards</span>
             <span class="p1-metric-val">${drtscilmTrend ? drtscilmTrend.charAt(0).toUpperCase()+drtscilmTrend.slice(1) : '—'}</span>
             <div class="p1-bar-row">${bar(drtscilmBarPct, false)}<div class="p1-rank">${drtscilmPct!=null ? Math.round(drtscilmPct)+'th pct.' : '—'}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Core Inflation (PCE, YoY) <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-label">Core Inflation (PCE, YoY)</span>
             <span class="p1-metric-val">${corePCE!=null ? corePCE.toFixed(1)+'%' : '—'}</span>
             <div class="p1-bar-row">${bar(corePCEPct)}<div class="p1-rank">${pctTxt(corePCEPct)}</div></div>
           </div>
