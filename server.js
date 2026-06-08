@@ -1255,7 +1255,7 @@ Headers: ${JSON.stringify(headers.slice(0, 20))}
 Sample rows: ${JSON.stringify(rows.slice(0, 5))}
 Return: {"mappings":{"standardField":"actualColumnHeader"},"summary":{"Label":"$value"}}
 For t12: find EGI, vacancy, opex, NOI, management, taxes, insurance, maintenance.
-For rentRoll: find unit, type, SF, in-place rent, market rent, lease dates, status.
+For rentRoll: find unit, type, SF, in-place rent, market rent, lease dates, status. Always include the average in-place/leased rent from the totals row in the summary (the column may be labeled "Average Leased", "Average In Place Rent", "Avg Rent", or similar — not market rent).
 For proForma: find EGI, vacancy, NOI, expenses, stabilized NOI, years.
 Summary: up to 8 key financial figures with formatted values.`
       }]
