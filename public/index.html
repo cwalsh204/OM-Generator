@@ -398,7 +398,7 @@
   .p1-signals { font-size:10.5px; color:rgba(255,255,255,0.6); line-height:1.5; }
   .p1-signals strong { color:var(--om-gold); font-weight:600; }
   .p1-grid { flex:1; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:1px; background:var(--om-border); }
-  .p1-quad { background:#fff; padding:14px 24px 12px; display:flex; flex-direction:column; gap:4px; }
+  .p1-quad { background:#fff; padding:14px 24px 12px; display:flex; flex-direction:column; gap:4px; overflow:hidden; }
   .p1-quad-header { display:flex; align-items:center; gap:10px; padding-bottom:8px; border-bottom:2px solid var(--cat); margin-bottom:6px; }
   .p1-quad-icon { width:30px; height:30px; border-radius:50%; background:var(--cat); display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700; }
   .p1-quad-title { font-family:'Cormorant Garamond',serif; font-size:17px; font-weight:700; color:var(--om-navy); flex:1; }
@@ -417,7 +417,7 @@
   .p1-rank { font-size:10px; color:var(--om-gray); font-weight:600; font-variant-numeric:tabular-nums; min-width:62px; text-align:right; letter-spacing:0.3px; }
   .p1-rank b { color:var(--cat); font-size:11.5px; font-weight:700; }
   .p1-inv-arrow { color:#4a9e6a; font-size:11px; margin-left:3px; }
-  .p1-quad-takeaway { margin-top:auto; padding-top:6px; border-top:1px dotted var(--om-border); font-size:10px; line-height:1.45; color:var(--om-gray); font-style:italic; }
+  .p1-quad-takeaway { margin-top:auto; padding-top:6px; border-top:1px dotted var(--om-border); font-size:10px; line-height:1.45; color:var(--om-gray); font-style:italic; overflow:hidden; }
   .p1-quad-takeaway strong { color:var(--om-navy); font-weight:600; font-style:normal; }
 
   /* ─── Market Overview P2 — Supply Collapse + Employment Engine ─────── */
@@ -1960,27 +1960,26 @@ function renderOM() {
 
       const empYoY    = a.employment?.yoy_growth ?? a.employment?.qcew?.yoy_growth ?? null;
       const empYoYPct = a.employment?.yoy_growth_percentile ?? null;
-      const avgWage   = a.employment?.qcew?.avg_wage ?? null;
-      const wagePct   = a.employment?.qcew?.avg_wage_percentile ?? null;
-      const wageGrowthReal = a.economicIndicators?.wageGrowthReal ?? null;
+      const zipUnemp  = a.employment?.zipUnemploymentRate ?? null;
+      const empCAGR10y= a.employment?.empCAGR10y ?? null;
 
       const spiScore  = a.permits?.supply_pressure_index?.current_score ?? null;
       const spiPct    = a.permits?.supply_pressure_index?.national_percentile ?? null;
       const permitsYTD= a.permits?.ytd_2026 ?? a.permits?.ytd_2025 ?? a.permits?.trailing_12_months?.total_units ?? null;
-      const vacancyRate = a.market?.vacancyRate != null ? parseFloat(a.market.vacancyRate) : null;
+      const mfShare   = a.census?.demographics?.mf_share?.value ?? null;
+      const mfSharePct= a.census?.demographics?.mf_share?.national_percentile ?? null;
 
       const ei        = a.economicIndicators || {};
       const macroEnv  = (ei.macroEnvironment || 'neutral').toLowerCase();
-      const recessions= ei.recessionSignalsTriggered ?? null;
-      const credit    = ei.creditConditionsLabel || 'Stable';
-      const creditPct = ei.creditConditionsPercentile ?? null;
+      const fhfaHPI   = ei.fhfaHPIYoY ?? null;
+      const fhfaHPIPct= ei.fhfaHPIPercentile ?? null;
       const corePCE   = ei.coreInflation ?? null;
       const corePCEPct= ei.coreInflationPercentile ?? null;
       const consConf  = ei.consumerConfidence ?? null;
       const consConfPct = ei.consumerConfidencePercentile ?? null;
 
-      const allPcts = [hhiPct, bachPct, popGPct, empYoYPct, wagePct,
-                       spiPct != null ? 100 - spiPct : null, creditPct, corePCEPct, consConfPct]
+      const allPcts = [hhiPct, bachPct, popGPct, empYoYPct,
+                       spiPct != null ? 100 - spiPct : null, fhfaHPIPct, corePCEPct, consConfPct]
                       .filter(v => typeof v === 'number');
       const composite = allPcts.length
         ? Math.round(allPcts.reduce((s,v) => s+v, 0) / allPcts.length)
@@ -1995,6 +1994,19 @@ function renderOM() {
       const pctTxt = v => v==null ? '—' : `<b>${Math.round(v)}${ord(v)}</b> pct.`;
       const fmtPct = v => v==null ? '—' : `${v>0?'+':''}${v}%`;
       const fmtUsd = v => v ? '$'+Number(v).toLocaleString() : '—';
+
+      // Sentence-aware takeaway truncation — fills available space, max ~2 sentences
+      const capTakeaway = (text, maxChars=230) => {
+        if (!text) return '';
+        const sents = text.replace(/([.!?])\s+([A-Z“"])/g, '$1\x1F$2').split('\x1F');
+        let out = '';
+        for (const s of sents) {
+          const next = out ? out + ' ' + s : s;
+          if (out && next.length > maxChars) break;
+          out = next;
+        }
+        return out.trim() || sents[0].trim();
+      };
 
       const heroHeadline = composite == null
         ? 'National benchmark across demand, supply, and macro indicators.'
@@ -2011,7 +2023,7 @@ function renderOM() {
           <div class="p1-hero-stat-label">Composite Percentile</div>
         </div>
         <div class="p1-hero-narrative">
-          <div class="p1-hero-eyebrow">${esc(inputs.city||'Submarket')} · National Benchmark${recessions!=null?` <span style="opacity:0.6;font-weight:400;">· ${recessions} of 8 recession signals · Credit ${esc(credit)}</span>`:''}</div>
+          <div class="p1-hero-eyebrow">${esc(inputs.city||'Submarket')} · National Benchmark</div>
           <div class="p1-hero-headline">${heroHeadline}</div>
           <div class="p1-hero-sub">${esc(o.marketOverview||'')}</div>
         </div>
@@ -2038,7 +2050,7 @@ function renderOM() {
             <span class="p1-metric-val">${popG!=null ? fmtPct(popG) : '—'}</span>
             <div class="p1-bar-row">${bar(popGPct)}<div class="p1-rank">${pctTxt(popGPct)}</div></div>
           </div>
-          <div class="p1-quad-takeaway">${esc((o.marketOverview||'').substring(0,150))}…</div>
+          <div class="p1-quad-takeaway">${esc(o.marketOverviewShort||capTakeaway(o.marketOverview||''))}</div>
         </div>
         <div class="p1-quad p1-q-emp">
           <div class="p1-quad-header">
@@ -2052,16 +2064,16 @@ function renderOM() {
             <div class="p1-bar-row">${bar(empYoYPct)}<div class="p1-rank">${pctTxt(empYoYPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Average Annual Wage</span>
-            <span class="p1-metric-val">${fmtUsd(avgWage)}</span>
-            <div class="p1-bar-row">${bar(wagePct)}<div class="p1-rank">${pctTxt(wagePct)}</div></div>
+            <span class="p1-metric-label">ZIP Unemployment Rate <span class="p1-inv-arrow">↓ better</span></span>
+            <span class="p1-metric-val">${zipUnemp!=null ? zipUnemp.toFixed(1)+'%' : '—'}</span>
+            <div class="p1-bar-row">${bar(zipUnemp!=null ? Math.max(0,Math.round((1-zipUnemp/12)*100)) : null, false)}<div class="p1-rank">${zipUnemp!=null ? (zipUnemp<=3?'Very low':zipUnemp<=5?'Below avg.':zipUnemp<=7?'Average':'Elevated') : '—'}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Wage Growth (Real, YoY)</span>
-            <span class="p1-metric-val">${wageGrowthReal!=null ? fmtPct(wageGrowthReal) : '—'}</span>
-            <div class="p1-bar-row">${bar(ei.wageGrowthRealPercentile??null)}<div class="p1-rank">${pctTxt(ei.wageGrowthRealPercentile??null)}</div></div>
+            <span class="p1-metric-label">10-Yr Employment CAGR</span>
+            <span class="p1-metric-val">${empCAGR10y!=null ? fmtPct(empCAGR10y) : '—'}</span>
+            <div class="p1-bar-row">${bar(empYoYPct)}<div class="p1-rank">${empCAGR10y!=null?(empCAGR10y>=2?'Strong':empCAGR10y>=1?'Moderate':empCAGR10y>=0?'Flat':'Contracting'):'—'}</div></div>
           </div>
-          <div class="p1-quad-takeaway">${esc((o.marketEmploymentNarrative||o.locationEmployers||'').substring(0,150))}…</div>
+          <div class="p1-quad-takeaway">${esc(o.marketEmploymentNarrativeShort||capTakeaway(o.marketEmploymentNarrative||''))}</div>
         </div>
         <div class="p1-quad p1-q-supply">
           <div class="p1-quad-header">
@@ -2080,11 +2092,11 @@ function renderOM() {
             <div class="p1-bar-row">${bar(spiPct,true)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">MF Vacancy Rate <span class="p1-inv-arrow">↓ better</span></span>
-            <span class="p1-metric-val">${vacancyRate != null ? vacancyRate.toFixed(1)+'%' : '—'}</span>
-            <div class="p1-bar-row">${bar(vacancyRate != null ? Math.max(0, Math.min(100, Math.round((1 - vacancyRate/15)*100))) : null, false)}<div class="p1-rank">${vacancyRate != null ? (vacancyRate <= 4 ? 'Very tight' : vacancyRate <= 6 ? 'Below avg.' : vacancyRate <= 9 ? 'Average' : 'Above avg.') : '—'}</div></div>
+            <span class="p1-metric-label">MF Share of Housing Stock</span>
+            <span class="p1-metric-val">${mfShare!=null ? mfShare.toFixed(1)+'%' : '—'}</span>
+            <div class="p1-bar-row">${bar(mfSharePct)}<div class="p1-rank">${pctTxt(mfSharePct)}</div></div>
           </div>
-          <div class="p1-quad-takeaway">${esc((o.marketSupplyDemand||'').substring(0,150))}…</div>
+          <div class="p1-quad-takeaway">${esc(o.marketSupplyDemandShort||capTakeaway(o.marketSupplyDemand||''))}</div>
         </div>
         <div class="p1-quad p1-q-macro">
           <div class="p1-quad-header">
@@ -2093,9 +2105,9 @@ function renderOM() {
             <div class="p1-quad-source">FRED · 27 series</div>
           </div>
           <div class="p1-metric">
-            <span class="p1-metric-label">Credit Conditions Index</span>
-            <span class="p1-metric-val">${esc(credit)}</span>
-            <div class="p1-bar-row">${bar(creditPct)}<div class="p1-rank">${pctTxt(creditPct)}</div></div>
+            <span class="p1-metric-label">FHFA House Price Index (YoY)</span>
+            <span class="p1-metric-val">${fhfaHPI!=null ? fmtPct(fhfaHPI) : '—'}</span>
+            <div class="p1-bar-row">${bar(fhfaHPIPct)}<div class="p1-rank">${pctTxt(fhfaHPIPct)}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">Core Inflation (PCE, YoY) <span class="p1-inv-arrow">↓ better</span></span>
@@ -2107,7 +2119,7 @@ function renderOM() {
             <span class="p1-metric-val">${consConf!=null ? consConf.toFixed(1) : '—'}</span>
             <div class="p1-bar-row">${bar(consConfPct)}<div class="p1-rank">${pctTxt(consConfPct)}</div></div>
           </div>
-          <div class="p1-quad-takeaway">${esc((o.marketMacroBackdrop||'').substring(0,150))}…</div>
+          <div class="p1-quad-takeaway">${esc(o.marketMacroBackdropShort||capTakeaway(o.marketMacroBackdrop||''))}</div>
         </div>
       </div>
     </div>`;

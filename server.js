@@ -167,19 +167,19 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 
 Call these tools in order:
 1. Rates — Treasury yields, SOFR, Freddie Mac agency rates, agency MF delinquency rate
-2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}
-3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}
+2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include multifamily share of total housing stock (mfSharePct) and its national percentile (mfSharePercentile)
+3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y)
 4. Residential permits — for this county
-5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY
+5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FHFA House Price Index YoY change (fhfaHPIYoY, FRED series USSTHPI or purchase-only) and its national percentile (fhfaHPIPercentile)
 6. Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
 
 After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 {
   "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "delinquencyRate": number, "termLTVBucket": string, "rateSheetSummary": string },
-  "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
+  "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "mfSharePct": number|null, "mfSharePercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
   "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "permits": { "ytd": number, "priorYear": number, "supplyPressureIndex": number, "permitPercentileRank": number, "trend": string, "annualData": [{ "year": number, "units": number }] },
-  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number },
+  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number, "fhfaHPIYoY": number|null, "fhfaHPIPercentile": number|null },
   "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
 }`;
 
@@ -940,8 +940,9 @@ app.post("/api/generate", async (req, res) => {
           median_household_income:   { value: c.medianIncome || null, national_percentile: c.incomePercentileRank || null },
           total_population:          { value: c.population || null },
           bachelor_degree_or_higher: { value: c.educationRate || null, national_percentile: c.educationPercentile || null },
-          population_growth:         { value: c.populationGrowth || null, national_percentile: c.populationGrowthPercentile || null },
-          owner_occupied:            { value: c.ownerOccupied || null }
+          population_growth:         { value: c.populationGrowth ?? c.populationGrowthPct ?? c.population_growth ?? null, national_percentile: c.populationGrowthPercentile ?? c.populationGrowthPercentileRank ?? null },
+          owner_occupied:            { value: c.ownerOccupied || null },
+          mf_share:                  { value: c.mfSharePct ?? null, national_percentile: c.mfSharePercentile ?? null }
         }
       };
     }
@@ -1263,10 +1264,14 @@ Return JSON with these exact keys:
 - locationEducation (array of up to 4 objects { name, desc, distance, mode } — schools and universities near the property; use LOCATION AMENITIES distanceMiles values exactly as searched — do NOT estimate distances; format as "~X.X mi"; mode "walk" if distanceMiles <= 0.6 else "drive")
 - locationTransit (array of up to 4 objects { name, desc, distance, mode } — metro stations, highway interchanges, airports near the property; use LOCATION AMENITIES distanceMiles values exactly as searched — do NOT estimate distances; format as "~X.X mi"; mode "walk" if distanceMiles <= 0.6 else "drive")
 - marketOverview (3-4 sentences — cite vacancy rates and rent figures from web research)
+- marketOverviewShort (exactly 1 complete sentence, max 160 characters — distill the single strongest demographic or demand insight for this submarket; no numbers unless essential)
 - marketSupplyDemand (2-3 sentences — cite Supply Pressure Index score and percentile)
+- marketSupplyDemandShort (exactly 1 complete sentence, max 160 characters — distill the key supply constraint story; cite SPI score or permit trend)
 - marketEmploymentNarrative (2-3 sentences — cite Property Demand Index score)
+- marketEmploymentNarrativeShort (exactly 1 complete sentence, max 160 characters — distill the headline employment story; cite job growth rate or major sector)
 - marketRentComps (2-3 sentences — cite specific rent figures from web research)
 - marketMacroBackdrop (2-3 sentences — cite rate environment from A.CRE data)
+- marketMacroBackdropShort (exactly 1 complete sentence, max 160 characters — distill the key macro signal for this deal; cite rate environment or HPI trend)
 - macroHeroHeadline (1 high-impact narrative sentence, max 150 characters — describe the macro environment and what it means for this deal in qualitative terms only. No data points, no percentages, no specific numbers. Write in the voice of a senior capital markets advisor. Example style: "Inflation re-accelerating and construction costs elevated, but agency credit stays open — a workable window for stabilized 10-year execution." Make it deal-relevant and forward-looking.)
 - macroNarrativeShort (exactly 2-3 sentences of concise narrative — Sentence 1: weave in the live 10Y UST rate, Freddie MF rate, and CPI YoY with directional language (e.g. "re-accelerating", "cooling", "holding steady"). Sentence 2: frame shelter inflation for rent implications — use the actual shelterInflation figure and describe whether it underpins, moderates, or pressures rent growth. Sentence 3: frame construction cost YoY for supply implications — use the actual constructionCostYoY figure and describe whether it suppresses, moderates, or stimulates new supply. Each sentence must reflect the actual direction of the data. Bold key numbers using <b>X%</b> HTML tags.)
 - financialSummaryNarrative (2 sentences — contextualize deal metrics vs market)
