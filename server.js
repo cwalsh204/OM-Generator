@@ -1025,8 +1025,8 @@ app.post("/api/generate", async (req, res) => {
 
       acreData.permits = {
         supply_pressure_index: { current_score: p.supplyPressureIndex, label: null, national_percentile: p.permitPercentileRank || null },
-        trailing_12_months:    { total_units: annualMap[currentYear] || p.ytd || null },
-        ytd_2025:              annualMap[currentYear] || p.ytd || null,
+        trailing_12_months:    { total_units: annualMap[currentYear] || null },
+        [`ytd_${currentYear}`]:  annualMap[currentYear] || null,
         permit_trend:          { annual_data: aggregatedAnnual.length >= 2 ? aggregatedAnnual : (p.annualData || null) }
       };
     }
