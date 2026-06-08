@@ -2273,7 +2273,7 @@ function renderOM() {
             <div style="display:flex;gap:14px;padding-left:4px;flex-shrink:0;">
               <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#1D9E75;display:inline-block;"></span>2×+ county avg</span>
               <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#378ADD;display:inline-block;"></span>1.2–2× county avg</span>
-              <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.22);border:1px solid #6b7280;display:inline-block;"></span>Below avg</span>
+              <span style="font-size:9px;color:#6b7280;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#4B5563;display:inline-block;"></span>Below avg</span>
             </div>
           </div>
           <div class="p2-sectors">
@@ -2655,7 +2655,7 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
     const barColors = sectors.map(s =>
       (s.ratio||0) >= 2.0 ? '#1D9E75' :
       (s.ratio||0) >= 1.2 ? '#378ADD' :
-      'rgba(255,255,255,0.22)'
+      '#4B5563'
     );
     const xMax = Math.ceil(Math.max(...sectors.map(s => s.share||0), 5) / 5) * 5 + 5;
     const _cleanSectorLabel = n => (n||'')
