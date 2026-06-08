@@ -42,7 +42,7 @@ try {
 }
 
 // ─── CACHE KEY NORMALISATION (city|state, lowercased and trimmed) ─────────────
-function normaliseCacheKey(city, state) {
+function normaliseCacheKey(city, state, zip) {
   const stateMap = {
     'alabama':'al','alaska':'ak','arizona':'az','arkansas':'ar','california':'ca',
     'colorado':'co','connecticut':'ct','delaware':'de','florida':'fl','georgia':'ga',
@@ -58,8 +58,9 @@ function normaliseCacheKey(city, state) {
   };
   const c = (city  || '').toLowerCase().trim().replace(/\s+/g,' ');
   const s = (state || '').toLowerCase().trim().replace(/\./g,'');
+  const z = (zip   || '').trim();
   const sNorm = stateMap[s] || s;
-  return `acre:${c}|${sNorm}`;
+  return z ? `acre:${c}|${sNorm}|${z}` : `acre:${c}|${sNorm}`;
 }
 
 // ─── A.CRE DATA CACHE — fallback in-memory for local dev without Redis ────────
@@ -112,10 +113,10 @@ function anthropicCall(payload, includeWebSearch = false, betaHeader = null) {
 }
 
 // ─── STEP 1: FETCH A.CRE DATA VIA MCP SDK (StreamableHTTP) ──────────────────
-async function fetchAcreData(address, city, state, county, msa) {
-  console.log(`Fetching A.CRE data via MCP SDK for: ${address}, ${city}, ${state}`);
+async function fetchAcreData(address, city, state, county, msa, zip) {
+  console.log(`Fetching A.CRE data via MCP SDK for: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}`);
 
-  const cacheKey = normaliseCacheKey(city, state);
+  const cacheKey = normaliseCacheKey(city, state, zip);
   const today = new Date().toDateString();
 
   // ── Try Redis first, fall back to in-memory, fall back to live fetch ──
@@ -162,12 +163,12 @@ async function fetchAcreData(address, city, state, county, msa) {
     // ── Initial prompt: tell Claude which tools to call and what JSON to return ──
     const systemPrompt = `You are a data retrieval agent. Call the A.CRE tools to fetch data for the given property, then return a JSON summary. Call ALL relevant tools before responding.`;
 
-    const userPrompt = `Fetch A.CRE Intelligence Hub data for: ${address}, ${city}, ${state}${county ? ` (County: ${county}` : ''}${msa ? `, MSA: ${msa}` : ''}${county || msa ? ')' : ''}.
+    const userPrompt = `Fetch A.CRE Intelligence Hub data for: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}${county ? ` (County: ${county}` : ''}${msa ? `, MSA: ${msa}` : ''}${county || msa ? ')' : ''}.
 
 Call these tools in order:
 1. Rates — Treasury yields, SOFR, Freddie Mac agency rates, agency MF delinquency rate
-2. Census/demographics — for address: ${address}, ${city}, ${state}
-3. Employment — QCEW data for this area
+2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}
+3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}
 4. Residential permits — for this county
 5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY
 6. Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
@@ -176,7 +177,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 {
   "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "delinquencyRate": number, "termLTVBucket": string, "rateSheetSummary": string },
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
-  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number }], "multifamilyDemandIndex": number },
+  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "permits": { "ytd": number, "priorYear": number, "supplyPressureIndex": number, "permitPercentileRank": number, "trend": string, "annualData": [{ "year": number, "units": number }] },
   "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number },
   "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
@@ -283,9 +284,9 @@ async function geocodeMapDots(address, city, state, destinations) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey || !destinations.length) return null;
   try {
-    // Step 1: geocode the property center
+    // Step 1: geocode the property center (address already includes ZIP if provided)
     const geoResp = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(`${address}, ${city}, ${state}`)}&key=${apiKey}`
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
     );
     const geoData = await geoResp.json();
     if (geoData.status !== 'OK' || !geoData.results.length) {
@@ -716,7 +717,7 @@ function buildDataContext(acreData, webFallbacks, inputs) {
   if (acreData.employment) {
     const e = acreData.employment;
     const sectors = (e.topSectors || []).slice(0, 4).map(s => `${s.name} (${Number(s.employees || 0).toLocaleString()} jobs, median $${Number(s.medianEarnings || 0).toLocaleString()})`).join(", ");
-    if (e.totalJobs) lines.push(`EMPLOYMENT [A.CRE/BLS-QCEW]: Total Jobs: ${Number(e.totalJobs).toLocaleString()}, YoY Growth: ${e.yoyGrowth || "N/A"}%, Multifamily Demand Index: ${e.multifamilyDemandIndex || "N/A"}/100, Top sectors: ${sectors || "N/A"}`);
+    if (e.totalJobs) lines.push(`EMPLOYMENT [A.CRE/BLS-QCEW]: Total Jobs: ${Number(e.totalJobs).toLocaleString()}, YoY Growth: ${e.yoyGrowth || "N/A"}%, Multifamily Demand Index: ${e.multifamilyDemandIndex || "N/A"}/100, Top sectors: ${sectors || "N/A"}${e.zipUnemploymentRate != null ? `, ZIP Unemployment: ${e.zipUnemploymentRate}%` : ''}${e.msaUnemploymentRate != null ? `, MSA Unemployment: ${e.msaUnemploymentRate}%` : ''}${e.trendDirection ? `, Trend: ${e.trendDirection}` : ''}${e.empCAGR5y != null ? `, 5yr CAGR: ${e.empCAGR5y}%` : ''}${e.momentumScore != null ? `, Momentum Score: ${e.momentumScore}` : ''}`);
   }
 
   // A.CRE Permits (flat structure from MCP)
@@ -841,9 +842,9 @@ app.post("/api/generate", async (req, res) => {
     // Step 1: Fetch A.CRE data via Claude MCP
     console.log("Step 1: Fetching live CRE market data...");
     const { county, msa } = inferCountyAndMSA(inputs);
-    const address = `${inputs.address}, ${inputs.city}, ${inputs.state}`;
+    const address = `${inputs.address}, ${inputs.city}, ${inputs.state}${inputs.zip ? ' ' + inputs.zip : ''}`;
     console.log(`Location: ${county}, ${msa}`);
-    const mcpData = await fetchAcreData(address, inputs.city, inputs.state, county, msa);
+    const mcpData = await fetchAcreData(address, inputs.city, inputs.state, county, msa, inputs.zip);
     const acreData = {
       county, msa,
       ...(mcpData || {}),
@@ -967,7 +968,16 @@ app.post("/api/generate", async (req, res) => {
             const score = raw != null ? (raw <= 1 ? Math.round(raw * 100) : Math.round(raw)) : null;
             return { score, label: score != null ? String(score) : null };
           })()
-        }
+        },
+        // ZIP-level and extended fields
+        zipUnemploymentRate: e.zipUnemploymentRate  ?? null,
+        msaUnemploymentRate: e.msaUnemploymentRate  ?? null,
+        momentumScore:       e.momentumScore        ?? null,
+        resilienceIndex:     e.resilienceIndex      ?? null,
+        empCAGR5y:           e.empCAGR5y            ?? null,
+        empCAGR10y:          e.empCAGR10y           ?? null,
+        covidRecoveryMonths: e.covidRecoveryMonths  ?? null,
+        trendDirection:      e.trendDirection       ?? null
       };
     }
     if (acreData.permits && acreData.permits.supplyPressureIndex !== undefined && !acreData.permits.supply_pressure_index) {

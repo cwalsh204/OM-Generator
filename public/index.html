@@ -718,7 +718,7 @@
 <script>
 const STAGES=["Deal inputs","Financing","Investment story","Uploads","Validation","OM preview"];
 let stage=0;
-const inputs={propName:"",address:"",city:"",state:"",assetType:"",yearBuilt:"",yearReno:"",totalUnits:"",totalSF:"",stories:"",unitMix:"",amenities:"",capex:"",parking:"",loanType:"",loanAmt:"",amortization:"",prepayment:"",loanTerm:"",ltc:"",ltv:"",dy:"",recourse:"",guarantor:"",sourcesUses:"",askingPrice:"",noi:"",capRate:"",occupancy:"",proFormaNOI:"",exitCap:"",market:"",strategy:"",valueAdd:"",risks:"",sponsorName:"",sponsorTrack:"",brokerName:"",tagline:"",t12Year:"",estSpread:""};
+const inputs={propName:"",address:"",city:"",state:"",zip:"",assetType:"",yearBuilt:"",yearReno:"",totalUnits:"",totalSF:"",stories:"",unitMix:"",amenities:"",capex:"",parking:"",loanType:"",loanAmt:"",amortization:"",prepayment:"",loanTerm:"",ltc:"",ltv:"",dy:"",recourse:"",guarantor:"",sourcesUses:"",askingPrice:"",noi:"",capRate:"",occupancy:"",proFormaNOI:"",exitCap:"",market:"",strategy:"",valueAdd:"",risks:"",sponsorName:"",sponsorTrack:"",brokerName:"",tagline:"",t12Year:"",estSpread:""};
 let files={t12:null,rentRoll:null,proForma:null};
 let parsedFiles={};
 let taggedImages=[];   // { tag, src, name } — replaces flat uploadedImages array
@@ -760,7 +760,7 @@ function s0(){return`
   <div class="grid2">
     ${f("propName","Property name","text",null,true)}
     ${f("address","Street address","text",null,true)}
-    ${f("city","City")}${f("state","State")}
+    ${f("city","City")}${f("state","State")}${f("zip","ZIP Code","text",null,true,"e.g. 28209")}
     ${f("assetType","Asset type","select",["Multifamily","Office","Retail","Industrial","Mixed-Use","Self-Storage","Hospitality","Land"])}
     ${f("yearBuilt","Year built")}${f("yearReno","Year renovated","text",null,false,"If applicable")}
   </div>
@@ -928,6 +928,7 @@ function validate(){
   errors=[];warnings=[];suggestions=[];
   if(!inputs.propName)errors.push("Property name is required");
   if(!inputs.address)errors.push("Property address is required");
+  if(!inputs.zip)errors.push("ZIP code is required");
   if(!inputs.assetType)errors.push("Asset type is required");
   if(!inputs.askingPrice)errors.push("Asking price / total cost is required");
   if(!inputs.noi)errors.push("Current NOI is required");
@@ -958,7 +959,7 @@ function s4(){
   warnings.forEach(w=>html+=`<div class="val-item warn"><span>${icon.warn}</span><span>${esc(w)}</span></div>`);
   suggestions.forEach(s=>html+=`<div class="val-item sugg"><span>${icon.sugg}</span><span>${esc(s)}</span></div>`);
   html+=`<div class="section-label" style="margin-top:28px;">Input summary</div><div class="confirm-grid">`;
-  [["Property",inputs.propName],["Address",`${inputs.address}, ${inputs.city} ${inputs.state}`],["Asset type",inputs.assetType],["Asking price",fmtCur(inputs.askingPrice)],["Current NOI",fmtCur(inputs.noi)],["Cap rate",fmtPct(inputs.capRate)],["Occupancy",fmtPct(inputs.occupancy)],["Loan type",inputs.loanType],["Loan amount",fmtCur(inputs.loanAmt)],["Debt yield",fmtPct(inputs.dy)],["Strategy",inputs.strategy],["T12",files.t12?`✓ ${files.t12.name}`:"—"],["Rent roll",files.rentRoll?`✓ ${files.rentRoll.name}`:"—"],["Photos",taggedImages.length>0?`${taggedImages.length} uploaded (${[...new Set(taggedImages.map(i=>i.tag))].map(t=>TAG_OPTIONS.find(o=>o.value===t)?.label||t).join(', ')})`:"—"]].forEach(([k,v])=>{
+  [["Property",inputs.propName],["Address",`${inputs.address}, ${inputs.city}, ${inputs.state} ${inputs.zip}`],["Asset type",inputs.assetType],["Asking price",fmtCur(inputs.askingPrice)],["Current NOI",fmtCur(inputs.noi)],["Cap rate",fmtPct(inputs.capRate)],["Occupancy",fmtPct(inputs.occupancy)],["Loan type",inputs.loanType],["Loan amount",fmtCur(inputs.loanAmt)],["Debt yield",fmtPct(inputs.dy)],["Strategy",inputs.strategy],["T12",files.t12?`✓ ${files.t12.name}`:"—"],["Rent roll",files.rentRoll?`✓ ${files.rentRoll.name}`:"—"],["Photos",taggedImages.length>0?`${taggedImages.length} uploaded (${[...new Set(taggedImages.map(i=>i.tag))].map(t=>TAG_OPTIONS.find(o=>o.value===t)?.label||t).join(', ')})`:"—"]].forEach(([k,v])=>{
     html+=`<div class="confirm-row"><span class="confirm-key">${esc(k)}</span><span class="confirm-val">${esc(v||"—")}</span></div>`;
   });
   html+=`</div>`;
@@ -1005,7 +1006,7 @@ function renderOM() {
   const equityPct = 100 - debtPct;
 
   // ── photos — PHASE 5: deduplicate by role ──
-  const fullAddress = `${inputs.address}, ${inputs.city}, ${inputs.state}`;
+  const fullAddress = `${inputs.address}, ${inputs.city}, ${inputs.state} ${inputs.zip}`;
   const mapSrc = `/api/map-image?address=${encodeURIComponent(fullAddress)}`;
   // ── Tagged image helpers ──────────────────────────────────────────
   const getImageByTag  = tag => taggedImages.find(img => img.tag === tag)?.src || null;
