@@ -1517,7 +1517,9 @@ function renderOM() {
     <div class="om-sec-body" style="display:flex;flex-direction:column;">
       <div class="om-highlight-grid">
         ${(o.investmentHighlights||[]).map((h,i)=>{
-          const {title,body}=parseHL(h);
+          const stripEmoji = s => (s||'').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}️‍\u{1F900}-\u{1F9FF}]/gu, '').replace(/\s{2,}/g,' ').trim();
+          const {title:_t,body:_b}=parseHL(h);
+          const title=stripEmoji(_t), body=stripEmoji(_b);
           const num=String(i+1).padStart(2,'0');
           // Truncate body at nearest complete sentence boundary (ignores decimals, abbreviations)
           const truncBody = (text => {
