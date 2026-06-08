@@ -2191,8 +2191,8 @@ function renderOM() {
 
       const permitTrendData = a.permits?.permit_trend?.annual_data || [];
       const annual     = permitTrendData.slice(-8);
-      const permitYears= annual.length===8 ? annual.map(d=>d.year) : [2018,2019,2020,2021,2022,2023,2024,2025];
-      const permitVals = annual.length===8 ? annual.map(d=>d.units||d.permits||0) : [2800,3200,2100,3500,2900,1800,620,permitsYTD||54];
+      const permitYears= annual.length>=2 ? annual.map(d=>d.year) : [2018,2019,2020,2021,2022,2023,2024,2025];
+      const permitVals = annual.length>=2 ? annual.map(d=>d.units||d.permits||0) : [2800,3200,2100,3500,2900,1800,620,permitsYTD||54];
       const permitMax  = Math.max(...permitVals,4000);
       const preStabAvg = Math.round(permitVals.slice(0,6).reduce((s,v)=>s+v,0)/6);
       const declinePct = preStabAvg ? Math.round((1-permitVals[permitVals.length-1]/preStabAvg)*100) : null;

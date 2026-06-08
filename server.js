@@ -169,7 +169,7 @@ Call these tools in order:
 1. Rates — Treasury yields, SOFR, Freddie Mac agency rates
 2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include multifamily share of total housing stock (mfSharePct) and its national percentile (mfSharePercentile)
 3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y)
-4. Residential permits — for this county
+4. Residential permits — for this county/MSA; include monthly historical permit data (include_history_months: 84) so annual totals can be computed
 5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FHFA House Price Index YoY change (fhfaHPIYoY, FRED series USSTHPI or purchase-only) and its national percentile (fhfaHPIPercentile)
 6. Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
 
@@ -992,11 +992,30 @@ app.post("/api/generate", async (req, res) => {
     }
     if (acreData.permits && acreData.permits.supplyPressureIndex !== undefined && !acreData.permits.supply_pressure_index) {
       const p = acreData.permits;
+
+      // Aggregate monthly MSA history into annual totals for the permit bar chart
+      const monthly = p.historical?.msa || [];
+      const currentYear = new Date().getFullYear().toString();
+      const annualMap = {};
+      monthly.forEach(m => {
+        const year = (m.date || '').slice(0, 4);
+        if (year) annualMap[year] = (annualMap[year] || 0) + (m.units_5_plus || 0);
+      });
+      const priorYears = Object.entries(annualMap)
+        .filter(([y]) => y !== currentYear)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-5)
+        .map(([year, units]) => ({ year, units }));
+      const ytd = annualMap[currentYear]
+        ? [{ year: `${currentYear} YTD`, units: annualMap[currentYear] }]
+        : [];
+      const aggregatedAnnual = [...priorYears, ...ytd];
+
       acreData.permits = {
         supply_pressure_index: { current_score: p.supplyPressureIndex, label: null, national_percentile: p.permitPercentileRank || null },
         trailing_12_months:    { total_units: p.ytd || null },
         ytd_2025:              p.ytd || null,
-        permit_trend:          { annual_data: p.annualData || null }
+        permit_trend:          { annual_data: aggregatedAnnual.length >= 2 ? aggregatedAnnual : (p.annualData || null) }
       };
     }
 
