@@ -2089,7 +2089,7 @@ function renderOM() {
           <div class="p1-metric">
             <span class="p1-metric-label">Poverty Rate <span class="p1-inv-arrow">↓ better</span></span>
             <span class="p1-metric-val">${povertyRate!=null ? povertyRate.toFixed(1)+'%' : '—'}</span>
-            <div class="p1-bar-row">${bar(povertyRatePct!=null ? 100-povertyRatePct : null, false)}<div class="p1-rank">${povertyRatePct!=null ? (povertyRatePct<=25?'Very low':povertyRatePct<=45?'Below avg.':povertyRatePct<=65?'Average':'Elevated') : '—'}</div></div>
+            <div class="p1-bar-row">${bar(povertyRatePct)}<div class="p1-rank">${povertyRatePct!=null ? (povertyRatePct<=25?'Very low':povertyRatePct<=45?'Below avg.':povertyRatePct<=65?'Average':'Elevated') : '—'}</div></div>
           </div>
           <div class="p1-quad-takeaway">${esc(o.marketOverviewShort||capTakeaway(o.marketOverview||''))}</div>
         </div>
@@ -2101,13 +2101,13 @@ function renderOM() {
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">YoY Employment Growth</span>
-            <span class="p1-metric-val">${empYoY!=null ? fmtPct(empYoY) : '—'}</span>
+            <span class="p1-metric-val">${empYoY!=null ? (empYoY>0?'+':'')+Number(empYoY).toFixed(2)+'%' : '—'}</span>
             <div class="p1-bar-row">${bar(empYoYPct)}<div class="p1-rank">${pctTxt(empYoYPct)}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">ZIP Unemployment Rate <span class="p1-inv-arrow">↓ better</span></span>
             <span class="p1-metric-val">${zipUnemp!=null ? zipUnemp.toFixed(1)+'%' : '—'}</span>
-            <div class="p1-bar-row">${bar(zipUnemp!=null ? Math.max(0,Math.round((1-zipUnemp/12)*100)) : null, false)}<div class="p1-rank">${zipUnemp!=null ? (zipUnemp<=3?'Very low':zipUnemp<=5?'Below avg.':zipUnemp<=7?'Average':'Elevated') : '—'}</div></div>
+            <div class="p1-bar-row">${bar(zipUnemp!=null ? Math.min(100,Math.round(zipUnemp*10)) : null)}<div class="p1-rank">${zipUnemp!=null ? (zipUnemp<=3?'Very low':zipUnemp<=5?'Below avg.':zipUnemp<=7?'Average':'Elevated') : '—'}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">10-Yr Employment CAGR</span>
@@ -2125,12 +2125,12 @@ function renderOM() {
           <div class="p1-metric">
             <span class="p1-metric-label">Permits YTD <span class="p1-inv-arrow">↓ better</span></span>
             <span class="p1-metric-val">${permitsYTD != null ? Number(permitsYTD).toLocaleString() : '—'}</span>
-            <div class="p1-bar-row">${bar(spiPct,true)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
+            <div class="p1-bar-row">${bar(spiPct)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">Supply Pressure Index <span class="p1-inv-arrow">↓ better</span></span>
             <span class="p1-metric-val">${spiScore!=null?`${spiScore}&thinsp;/&thinsp;100`:'—'}</span>
-            <div class="p1-bar-row">${bar(spiPct,true)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
+            <div class="p1-bar-row">${bar(spiPct)}<div class="p1-rank">${pctTxt(spiPct)}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">% Renter Occupied</span>
@@ -2153,7 +2153,7 @@ function renderOM() {
           <div class="p1-metric">
             <span class="p1-metric-label">Core Inflation (PCE, YoY) <span class="p1-inv-arrow">↓ better</span></span>
             <span class="p1-metric-val">${corePCE!=null ? corePCE.toFixed(1)+'%' : '—'}</span>
-            <div class="p1-bar-row">${bar(corePCEPct,true)}<div class="p1-rank">${pctTxt(corePCEPct)}</div></div>
+            <div class="p1-bar-row">${bar(corePCEPct)}<div class="p1-rank">${pctTxt(corePCEPct)}</div></div>
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">Consumer Confidence Index</span>
