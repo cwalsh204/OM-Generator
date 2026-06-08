@@ -2243,8 +2243,8 @@ function renderOM() {
             <div class="p2-mini-stat-label">MF Permits YTD</div>
           </div>
           <div class="p2-mini-stat" style="border-left:1px solid var(--om-border);padding-left:28px;">
-            <div class="p2-mini-stat-val ${empCAGR!=null && empCAGR>0 ? '' : 'red'}">${empCAGR!=null ? (empCAGR>0?'+':'')+empCAGR+'%' : '—'}</div>
-            <div class="p2-mini-stat-label">${empVals.length-1}-Yr Emp. Growth</div>
+            ${(() => { const cagr5 = a.employment?.empCAGR5y ?? null; return `<div class="p2-mini-stat-val ${cagr5!=null && cagr5>0 ? '' : 'red'}">${cagr5!=null ? (cagr5>0?'+':'')+Number(cagr5).toFixed(1)+'%' : '—'}</div>`; })()}
+            <div class="p2-mini-stat-label">5-Yr Emp. CAGR</div>
           </div>
         </div>
       </div>
