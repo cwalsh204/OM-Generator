@@ -447,54 +447,27 @@ ADDRESS: ${inputs.address}, ${inputs.city}, ${inputs.state}
 COUNTY: ${acreData.county}, MSA: ${acreData.msa}
 
 Search queries to run:
-- "${inputs.city} ${inputs.state} median household income 2024 2025"
-- "${inputs.city} multifamily market vacancy rent 2025 2026"
-- "${acreData.county} multifamily permits supply pipeline 2025"
-- "10 year treasury yield today"
-- "SOFR rate today"
-- "Freddie Mac multifamily rates 2026"
-- "Freddie Mac multifamily serious delinquency rate Q4 2025 quarterly"
-- "Fannie Mae multifamily delinquency rate Q4 2025 quarterly supplement"
-- "${inputs.city} ${inputs.state} major employers 2025"
-- "${inputs.city} Class A apartment rent comps 2025"
-- "${acreData.county} rent stabilization rent control 2024 2025"
+- "${acreData.msa} multifamily vacancy rate average asking rent occupancy YoY rent growth 2025 2026 CBRE JLL CoStar"
+- "${acreData.msa} multifamily units under construction pipeline deliveries 2025 2026"
+- "${acreData.county} rent stabilization rent control ordinance 2024 2025"
+- "${inputs.city} ${inputs.state} top employers named companies employee headcounts 2025"
 - "grocery stores restaurants retail near ${inputs.address} ${inputs.city} ${inputs.state} walking distance miles"
-- "metro subway bus transit stops near ${inputs.address} ${inputs.city} distance"
-- "walk score ${inputs.address} ${inputs.city} ${inputs.state}"
+- "metro subway bus transit stops schools universities near ${inputs.address} ${inputs.city} distance"
+- "${acreData.msa} multifamily market outlook macro conditions 2025 2026"
 
 Return this exact JSON structure with real numbers only:
 {
-  "rates": {
-    "treasury_10y": number|null,
-    "treasury_5y": number|null,
-    "sofr": number|null,
-    "freddieMFRate": number|null
-  },
-  "agencyDelinquency": {
-    "freddie": number|null,
-    "fannie": number|null,
-    "period": string|null
-  },
-  "demographics": {
-    "medianHouseholdIncome": number|null,
-    "population": number|null,
-    "populationGrowthPct": number|null,
-    "bachelorsDegreeRatePct": number|null,
-    "medianAge": number|null,
-    "renterOccupiedPct": number|null
-  },
   "employment": {
-    "totalJobs": number|null,
-    "yoyGrowthPct": number|null,
-    "unemploymentRatePct": number|null,
-    "topEmployers": [{"name": string, "employees": number}],
-    "topSectors": [{"name": string, "employees": number}]
+    "topEmployers": [{"name": string, "employees": number}]
   },
   "multifamilyMarket": {
+    "submarket": string|null,
     "vacancyRatePct": number|null,
     "avgAskingRentPerUnit": number|null,
+    "occupancyPct": number|null,
     "yoyRentGrowthPct": number|null,
     "underConstructionUnits": number|null,
+    "deliveriesNext12Months": number|null,
     "capRateRange": string|null
   },
   "rentComps": [
@@ -507,23 +480,17 @@ Return this exact JSON structure with real numbers only:
     }
   ],
   "supplyPipeline": {
-    "permitsYTD": number|null,
-    "permitsPriorYear": number|null,
     "unitsUnderConstruction": number|null,
+    "deliveriesNext12Months": number|null,
     "supplyNarrative": string|null
   },
   "macroBackdrop": {
-    "fedFundsRate": number|null,
-    "cpiYoYPct": number|null,
     "multifamilyOutlook": string|null,
     "macroNarrative": string|null
   },
-  "legislation": string|null,
+  "legislationNarrative": string|null,
   "marketNarrative": string|null,
   "locationAmenities": {
-    "walkScore": number|null,
-    "transitScore": number|null,
-    "bikeScore": number|null,
     "nearbyRetail": [{"name": string, "type": string, "distanceMiles": number}],
     "nearbyDining": [{"name": string, "type": string, "distanceMiles": number}],
     "nearbyTransit": [{"name": string, "type": string, "distanceMiles": number}],
@@ -631,7 +598,6 @@ async function fillDataGaps(haikusData, address, city, state, county) {
   const _hasRealEmployers = (haikusData?.employment?.topEmployers || []).some(e => !isQcewSector(e.name));
   if (!_hasRealEmployers) missingFields.push('top named employers in ' + city + ' ' + state + ' with employee headcounts 2025 — list specific named companies and organizations only, not industry sectors');
   if (!haikusData?.multifamilyMarket?.vacancyRatePct) missingFields.push(city + ' multifamily vacancy rate 2025 2026 CBRE JLL');
-  if (!haikusData?.demographics?.medianHouseholdIncome) missingFields.push(city + ' ' + state + ' median household income census 2024');
   if (!haikusData?.macroBackdrop?.macroNarrative) missingFields.push('multifamily market outlook 2026 Freddie Mac Fannie Mae');
   if (!haikusData?.locationAmenities?.nearbyRetail?.length) missingFields.push(`walking distance to retail grocery restaurants transit from ${address} ${city} ${state} — return specific place names and distances in miles from this exact address`);
 
@@ -657,7 +623,6 @@ Return JSON with only these fields:
   "rentComps": [{"propertyName": string, "units": number, "yearBuilt": number, "avgRentPerUnit": number, "occupancyPct": number}],
   "topEmployers": [{"name": string, "employees": number, "sector": string}],
   "vacancyRatePct": number|null,
-  "medianHouseholdIncome": number|null,
   "macroNarrative": string|null,
   "locationAmenities": {
     "walkScore": number|null,
@@ -685,7 +650,6 @@ Return JSON with only these fields:
         if (gapData.rentComps?.length) haikusData.rentComps = gapData.rentComps;
         if (gapData.topEmployers?.length) { haikusData.employment = haikusData.employment || {}; haikusData.employment.topEmployers = gapData.topEmployers; }
         if (gapData.vacancyRatePct) { haikusData.multifamilyMarket = haikusData.multifamilyMarket || {}; haikusData.multifamilyMarket.vacancyRatePct = gapData.vacancyRatePct; }
-        if (gapData.medianHouseholdIncome) { haikusData.demographics = haikusData.demographics || {}; haikusData.demographics.medianHouseholdIncome = gapData.medianHouseholdIncome; }
         if (gapData.macroNarrative) { haikusData.macroBackdrop = haikusData.macroBackdrop || {}; haikusData.macroBackdrop.macroNarrative = gapData.macroNarrative; }
         if (gapData.locationAmenities) haikusData.locationAmenities = gapData.locationAmenities;
       }
