@@ -969,17 +969,18 @@ app.post("/api/generate", async (req, res) => {
         trendDirection:      e.trendDirection       ?? null
       };
     }
-    if (acreData.permits && acreData.permits.supplyPressureIndex !== undefined && !acreData.permits.supply_pressure_index) {
+    if (acreData.permits) {
       const p = acreData.permits;
-
-      // Aggregate monthly MSA history into annual totals for the permit bar chart
-      const monthly = p.historical?.msa || [];
       const currentYear = new Date().getFullYear().toString();
+
+      // Aggregate monthly data into annual totals
+      const monthly = p.monthly || p.historical?.msa || [];
       const annualMap = {};
       monthly.forEach(m => {
         const year = (m.date || '').slice(0, 4);
-        if (year) annualMap[year] = (annualMap[year] || 0) + (m.units_5_plus || 0);
+        if (year) annualMap[year] = (annualMap[year] || 0) + (m.units || m.units_5_plus || 0);
       });
+
       const priorYears = Object.entries(annualMap)
         .filter(([y]) => y !== currentYear)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -988,13 +989,12 @@ app.post("/api/generate", async (req, res) => {
       const ytd = annualMap[currentYear]
         ? [{ year: `${currentYear} YTD`, units: annualMap[currentYear] }]
         : [];
-      const aggregatedAnnual = [...priorYears, ...ytd];
 
       acreData.permits = {
-        supply_pressure_index: { current_score: p.supplyPressureIndex, label: null, national_percentile: p.permitPercentileRank || null },
+        supply_pressure_index: { current_score: p.supplyPressureIndex || null, national_percentile: p.permitPercentileRank || null },
         trailing_12_months:    { total_units: annualMap[currentYear] || null },
-        [`ytd_${currentYear}`]:  annualMap[currentYear] || null,
-        permit_trend:          { annual_data: aggregatedAnnual.length >= 2 ? aggregatedAnnual : (p.annualData || null) }
+        [`ytd_${currentYear}`]: annualMap[currentYear] || null,
+        permit_trend:          { annual_data: [...priorYears, ...ytd] }
       };
     }
 
