@@ -161,17 +161,17 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
     }));
 
     // ── Initial prompt: tell Claude which tools to call and what JSON to return ──
-    const systemPrompt = `You are a data retrieval agent. Call the A.CRE tools to fetch data for the given property, then return a JSON summary. Call ALL relevant tools before responding.`;
+    const systemPrompt = `You are a data retrieval agent. Call the A.CRE tools to fetch data for the given property, then return a JSON summary. You MUST call ALL tools simultaneously in a single response — return all tool_use blocks at once without waiting for any results first.`;
 
     const userPrompt = `Fetch A.CRE Intelligence Hub data for: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}${county ? ` (County: ${county}` : ''}${msa ? `, MSA: ${msa}` : ''}${county || msa ? ')' : ''}.
 
-Call these tools in order:
-1. Rates — Treasury yields, SOFR, Freddie Mac agency rates
-2. Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include: poverty rate and its national percentile (povertyRate, povertyRatePercentile); % renter-occupied housing and its national percentile (renterOccupiedPct, renterOccupiedPercentile)
-3. Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y); for each top sector include establishment share % (share) and location quotient / concentration ratio vs MSA avg (ratio)
-4. Residential permits — for this county/MSA; include monthly historical permit data (include_history_months: 84) so annual totals can be computed
-5. Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FRED series DRTSCILM (% banks tightening CRE loan standards): latest value, its 5-year percentile (drtscilmPctile5yr), and trend direction — "tightening", "loosening", or "neutral" (drtscilmTrend)
-6. Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
+Call ALL of the following tools simultaneously in one response (do not call them one at a time):
+- Rates — Treasury yields, SOFR, Freddie Mac agency rates
+- Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include: poverty rate and its national percentile (povertyRate, povertyRatePercentile); % renter-occupied housing and its national percentile (renterOccupiedPct, renterOccupiedPercentile)
+- Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y); for each top sector include establishment share % (share) and location quotient / concentration ratio vs MSA avg (ratio)
+- Residential permits — for this county/MSA; include monthly historical permit data (include_history_months: 84) so annual totals can be computed
+- Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FRED series DRTSCILM (% banks tightening CRE loan standards): latest value, its 5-year percentile (drtscilmPctile5yr), and trend direction — "tightening", "loosening", or "neutral" (drtscilmTrend)
+- Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
 
 After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 {
@@ -1234,16 +1234,25 @@ Summary: up to 8 key financial figures with formatted values.`
 
     // ── For rent roll: extract exact average leased rent from totals row in code (no Claude inference) ──
     if (fileType === 'rentRoll' && allRows && headers) {
-      // Find column index whose header matches average leased/in-place rent variations
+      // Find column index whose header matches any known rent column naming convention
       const rentColIdx = headers.findIndex(h =>
         /avg(erage)?\s*(leased|in.?place|current|actual)\s*rent/i.test(h) ||
         /in.?place\s*rent/i.test(h) ||
         /leased\s*(rent|amt)/i.test(h) ||
-        /avg\s*rent/i.test(h)
+        /avg\s*rent/i.test(h) ||
+        /avg(erage)?\s*monthly\s*rent/i.test(h) ||
+        /contract\s*rent/i.test(h) ||
+        /effective\s*rent/i.test(h) ||
+        /rent\s*\/?\s*unit/i.test(h) ||
+        /current\s*monthly/i.test(h) ||
+        /asking\s*rent/i.test(h)
       );
-      // Find the last totals/averages row
+      // Find the last totals/averages row — scan any cell in the row, not just column A
       const totalsRow = [...allRows].reverse().find(r =>
-        /^(total|totals|average|averages|totals\s*\/\s*averages|grand\s*total|all\s*units|overall)$/i.test(String(r[0]||'').trim())
+        r.some(cell =>
+          /^(total|totals|average|averages|totals\s*\/\s*averages|grand\s*total|all\s*units|overall|summary|portfolio\s*total|avg\s*all|weighted\s*avg)$/i
+            .test(String(cell || '').trim())
+        )
       );
       if (rentColIdx >= 0 && totalsRow) {
         const raw = String(totalsRow[rentColIdx] || '').replace(/[$,\s]/g, '');

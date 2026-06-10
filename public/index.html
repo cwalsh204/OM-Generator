@@ -1116,7 +1116,7 @@ function renderOM() {
   // ── avg rent & units ──
   const numUnits = parseInt(String(inputs.totalUnits||'0').replace(/[^0-9]/g,''))||0;
   const _safeMonthly = v => { const n = parseFloat(String(v||'0').replace(/[^0-9.]/g,'')); return n > 100 ? n : 0; };
-  const _inPlaceNum = _safeMonthly(inputs.avgRent) || _safeMonthly(inputs.avgInPlaceRent);
+  const _inPlaceNum = 0;
   const rrs = parsedFiles.rentRoll?.summary || {};
   const _rrEntry = Object.entries(rrs).find(([k,v]) => /rent|avg/i.test(k) && _safeMonthly(v) > 0);
   const avgRent = _inPlaceNum > 0 ? fmtCur(_inPlaceNum)
@@ -1388,7 +1388,7 @@ function renderOM() {
         const _noiN     = _p(inputs.noi);
         const _pfNoiN   = _p(inputs.proFormaNOI);
         const _occN     = _p(inputs.occupancy);
-        const _inPlaceRent = (_rrEntry ? _safeMonthly(_rrEntry[1]) : 0) || _p(inputs.avgRent) || _p(inputs.avgInPlaceRent);
+        const _inPlaceRent = _rrEntry ? _safeMonthly(_rrEntry[1]) : 0;
         const _spreadBps = _p(inputs.estSpread) || 170;
         const _baseRate  = +(t10 + _spreadBps/100).toFixed(4) / 100;
         const _amortYears = (() => { const s=String(inputs.amortization||''); if(/interest only|IO/i.test(s)) return 0; const n=parseInt(s.replace(/[^0-9]/g,'')); return n||30; })();
