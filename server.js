@@ -213,7 +213,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
       const toolResults = [];
 
       for (const block of toolUseBlocks) {
-        if (JSON.stringify(block.input).toLowerCase().includes('permit')) {
+        if (block.name.toLowerCase().includes('residential') || block.name.toLowerCase().includes('permit')) {
           block.input = { ...block.input, include_history_months: 84 };
         }
         console.log(`Calling A.CRE tool: ${block.name}`, JSON.stringify(block.input));
@@ -222,9 +222,6 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
           const resultText = Array.isArray(result.content)
             ? result.content.map(c => c.text || JSON.stringify(c)).join('\n')
             : JSON.stringify(result);
-          if (JSON.stringify(block.input).toLowerCase().includes('permit')) {
-            console.log('RAW PERMITS RESPONSE:', resultText.slice(0, 3000));
-          }
           toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText });
         } catch (toolErr) {
           console.warn(`Tool ${block.name} failed:`, toolErr.message);
@@ -972,18 +969,15 @@ app.post("/api/generate", async (req, res) => {
         trendDirection:      e.trendDirection       ?? null
       };
     }
-    if (acreData.permits) {
+    if (acreData.permits && acreData.permits.supplyPressureIndex !== undefined && !acreData.permits.supply_pressure_index) {
       const p = acreData.permits;
       const currentYear = new Date().getFullYear().toString();
-
-      // Aggregate monthly data into annual totals
-      const monthly = p.monthly || p.historical?.msa || [];
+      const monthly = p.historical?.msa || [];
       const annualMap = {};
       monthly.forEach(m => {
         const year = (m.date || '').slice(0, 4);
-        if (year) annualMap[year] = (annualMap[year] || 0) + (m.units || m.units_5_plus || 0);
+        if (year) annualMap[year] = (annualMap[year] || 0) + (m.units_5_plus || 0);
       });
-
       const priorYears = Object.entries(annualMap)
         .filter(([y]) => y !== currentYear)
         .sort(([a], [b]) => a.localeCompare(b))
@@ -992,12 +986,12 @@ app.post("/api/generate", async (req, res) => {
       const ytd = annualMap[currentYear]
         ? [{ year: `${currentYear} YTD`, units: annualMap[currentYear] }]
         : [];
-
+      const aggregatedAnnual = [...priorYears, ...ytd];
       acreData.permits = {
-        supply_pressure_index: { current_score: p.supplyPressureIndex || null, national_percentile: p.permitPercentileRank || null },
+        supply_pressure_index: { current_score: p.supplyPressureIndex, label: null, national_percentile: p.permitPercentileRank || null },
         trailing_12_months:    { total_units: annualMap[currentYear] || null },
         [`ytd_${currentYear}`]: annualMap[currentYear] || null,
-        permit_trend:          { annual_data: [...priorYears, ...ytd] }
+        permit_trend:          { annual_data: aggregatedAnnual.length >= 2 ? aggregatedAnnual : (p.annualData || null) }
       };
     }
 
