@@ -178,7 +178,6 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
   "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "termLTVBucket": string, "rateSheetSummary": string },
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "povertyRate": number|null, "povertyRatePercentile": number|null, "renterOccupiedPct": number|null, "renterOccupiedPercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
   "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
-  "permits": { "ytd": number, "priorYear": number, "supplyPressureIndex": number, "permitPercentileRank": number, "trend": string, "annualData": [{ "year": number, "units": number }] },
   "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number, "drtscilmValue": number|null, "drtscilmPctile5yr": number|null, "drtscilmTrend": string|null },
   "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
 }`;
@@ -189,6 +188,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
     let finalText = '';
     let iterations = 0;
     const maxIterations = 10;
+    let nodePermits = null; // computed in Node from raw ACRE response — bypasses Haiku
 
     while (iterations < maxIterations) {
       iterations++;
@@ -222,6 +222,47 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
           const resultText = Array.isArray(result.content)
             ? result.content.map(c => c.text || JSON.stringify(c)).join('\n')
             : JSON.stringify(result);
+
+          // ── Compute permits deterministically in Node — no LLM arithmetic ──
+          if (JSON.stringify(block.input).includes('residential-permits')) {
+            try {
+              const raw  = JSON.parse(resultText);
+              const msa  = raw?.data?.msa;
+              const hist = raw?.data?.historical?.msa;
+              const byYear = (hist || []).reduce((acc, m) => {
+                const yr = Number((m.date || '').slice(0, 4));
+                if (yr) acc[yr] = (acc[yr] || 0) + (m.units_5_plus || 0);
+                return acc;
+              }, {});
+              if (msa) {
+                const currentYear = new Date().getFullYear();
+                nodePermits = {
+                  supply_pressure_index: {
+                    current_score: msa.supply_pressure?.multifamily?.score ?? null,
+                    national_percentile: msa.supply_pressure?.multifamily?.pctile_national ?? null
+                  },
+                  trailing_12_months: { total_units: msa.trailing_12m?.units_5_plus ?? null },
+                  [`ytd_${currentYear}`]: byYear[currentYear] || null,
+                  permit_trend: {
+                    annual_data: [
+                      ...Object.entries(byYear)
+                        .filter(([y]) => Number(y) !== currentYear)
+                        .sort(([a], [b]) => Number(a) - Number(b))
+                        .slice(-5)
+                        .map(([year, units]) => ({ year: Number(year), units })),
+                      ...(byYear[currentYear]
+                        ? [{ year: `${currentYear} YTD`, units: byYear[currentYear] }]
+                        : [])
+                    ]
+                  }
+                };
+                console.log(`Node permits computed: SPI=${nodePermits.supply_pressure_index.current_score}, YTD=${nodePermits[`ytd_${currentYear}`]}, years=${nodePermits.permit_trend.annual_data.length}`);
+              }
+            } catch (e) {
+              console.warn('Node permits parse failed:', e.message);
+            }
+          }
+
           toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText });
         } catch (toolErr) {
           console.warn(`Tool ${block.name} failed:`, toolErr.message);
@@ -238,6 +279,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
     const jsonMatch = finalText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0]);
+      if (nodePermits) data.permits = nodePermits;
       console.log('A.CRE data fetched successfully via MCP SDK');
       console.log('Macro environment:', data.economicIndicators?.macroEnvironment);
       // ── Write to Redis (24hr TTL) or fall back to in-memory ──
@@ -969,31 +1011,7 @@ app.post("/api/generate", async (req, res) => {
         trendDirection:      e.trendDirection       ?? null
       };
     }
-    if (acreData.permits && acreData.permits.supplyPressureIndex !== undefined && !acreData.permits.supply_pressure_index) {
-      const p = acreData.permits;
-      const currentYear = new Date().getFullYear().toString();
-      const monthly = p.historical?.msa || [];
-      const annualMap = {};
-      monthly.forEach(m => {
-        const year = (m.date || '').slice(0, 4);
-        if (year) annualMap[year] = (annualMap[year] || 0) + (m.units_5_plus || 0);
-      });
-      const priorYears = Object.entries(annualMap)
-        .filter(([y]) => y !== currentYear)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-5)
-        .map(([year, units]) => ({ year, units }));
-      const ytd = annualMap[currentYear]
-        ? [{ year: `${currentYear} YTD`, units: annualMap[currentYear] }]
-        : [];
-      const aggregatedAnnual = [...priorYears, ...ytd];
-      acreData.permits = {
-        supply_pressure_index: { current_score: p.supplyPressureIndex, label: null, national_percentile: p.permitPercentileRank || null },
-        trailing_12_months:    { total_units: annualMap[currentYear] || null },
-        [`ytd_${currentYear}`]: annualMap[currentYear] || null,
-        permit_trend:          { annual_data: aggregatedAnnual.length >= 2 ? aggregatedAnnual : (p.annualData || null) }
-      };
-    }
+    // permits are computed in Node during the tool loop (nodePermits) and injected into data before caching
 
     // ── Normalize economicIndicators.macroEnvironment → exact keyword ──
     // ── Normalize DRTSCILM trend direction to lowercase keyword ──
