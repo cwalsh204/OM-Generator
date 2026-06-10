@@ -222,6 +222,9 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
           const resultText = Array.isArray(result.content)
             ? result.content.map(c => c.text || JSON.stringify(c)).join('\n')
             : JSON.stringify(result);
+          if (block.name.toLowerCase().includes('residential') || block.name.toLowerCase().includes('permit')) {
+            console.log('RAW PERMITS RESPONSE:', resultText.slice(0, 3000));
+          }
           toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText });
         } catch (toolErr) {
           console.warn(`Tool ${block.name} failed:`, toolErr.message);
