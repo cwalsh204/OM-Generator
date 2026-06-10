@@ -213,7 +213,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
       const toolResults = [];
 
       for (const block of toolUseBlocks) {
-        if (block.name.toLowerCase().includes('residential') || block.name.toLowerCase().includes('permit')) {
+        if (JSON.stringify(block.input).toLowerCase().includes('permit')) {
           block.input = { ...block.input, include_history_months: 84 };
         }
         console.log(`Calling A.CRE tool: ${block.name}`, JSON.stringify(block.input));
@@ -222,7 +222,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
           const resultText = Array.isArray(result.content)
             ? result.content.map(c => c.text || JSON.stringify(c)).join('\n')
             : JSON.stringify(result);
-          if (block.name.toLowerCase().includes('residential') || block.name.toLowerCase().includes('permit')) {
+          if (JSON.stringify(block.input).toLowerCase().includes('permit')) {
             console.log('RAW PERMITS RESPONSE:', resultText.slice(0, 3000));
           }
           toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText });
