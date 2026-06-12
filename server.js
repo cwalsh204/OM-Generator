@@ -493,7 +493,7 @@ async function geocodeMapDots(address, city, state, destinations) {
   try {
     // Step 1: geocode the property center (address already includes ZIP if provided)
     const geoResp = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(`${address}, ${city}, ${state}`)}&key=${apiKey}`
     );
     const geoData = await geoResp.json();
     if (geoData.status !== 'OK' || !geoData.results.length) {
@@ -1244,11 +1244,10 @@ app.post("/api/generate", async (req, res) => {
     ].filter(d => d.name);
 
     const _mapCacheKey = `mapDots:${(inputs.address||'').toLowerCase().trim()}|${(inputs.city||'').toLowerCase().trim()}|${(inputs.state||'').toLowerCase().trim()}`;
-    let _mapDots = null; // TEMP: cache read bypassed for dot-position diagnostic — restore after run
+    let _mapDots = null; // TEMP: cache read bypassed — restore after Denver re-geocodes with city/state fix
     // try {
     //   if (redis) { _mapDots = await redis.get(_mapCacheKey); if (_mapDots) console.log('Map dots: Redis cache hit'); }
     // } catch(e) { console.warn('Map dots cache read failed:', e.message); }
-    console.log('Map dots: cache bypassed — forcing recompute for diagnostic');
 
     if (!_mapDots && _mapDestinations.length > 0) {
       _mapDots = await geocodeMapDots(inputs.address, inputs.city, inputs.state, _mapDestinations);

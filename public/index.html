@@ -1720,36 +1720,40 @@ function renderOM() {
         const dots = [];
         // Retail → 5-min ring (daily errands)
         (Array.isArray(o.locationRetail) ? o.locationRetail : []).slice(0, 3).forEach(e => {
-          if (e && e.name) dots.push({ name: _truncMapLabel(e.name), ring: 5 });
+          if (e && e.name) dots.push({ name: e.name, displayName: _truncMapLabel(e.name), ring: 5 });
         });
         // Major employers → 5–10-min rings (workforce)
         (Array.isArray(o.locationMajorEmployers) ? o.locationMajorEmployers : []).slice(0, 3).forEach((e, i) => {
-          if (e && e.name) dots.push({ name: _truncMapLabel(e.name), ring: i < 1 ? 5 : 10 });
+          if (e && e.name) dots.push({ name: e.name, displayName: _truncMapLabel(e.name), ring: i < 1 ? 5 : 10 });
         });
         // Transit → 10-min ring
         (Array.isArray(o.locationTransit) ? o.locationTransit : []).slice(0, 2).forEach(e => {
-          if (e && e.name) dots.push({ name: _truncMapLabel(e.name), ring: 10 });
+          if (e && e.name) dots.push({ name: e.name, displayName: _truncMapLabel(e.name), ring: 10 });
         });
         // Education → 15-min ring
         (Array.isArray(o.locationEducation) ? o.locationEducation : []).slice(0, 2).forEach(e => {
-          if (e && e.name) dots.push({ name: _truncMapLabel(e.name), ring: 15 });
+          if (e && e.name) dots.push({ name: e.name, displayName: _truncMapLabel(e.name), ring: 15 });
         });
         // Fallback: parse from free-text locationEmployers if no structured data
         if (dots.length === 0) {
           const _empText = o.locationEmployers || '';
           const _empMatches = [...(_empText.matchAll(/([A-Z][A-Za-z &'.,-]{2,40})\s*[\(–-]\s*([\d,.]+[KkMm]?)\s*(?:people|employees|jobs|workers)?/g))];
-          _empMatches.slice(0, 8).forEach((m, i) => dots.push({ name: _truncMapLabel(m[1].trim().split(/[,]/)[0]), ring: i < 2 ? 5 : i < 5 ? 10 : 15 }));
+          _empMatches.slice(0, 8).forEach((m, i) => {
+            const _raw = m[1].trim().split(/[,]/)[0];
+            dots.push({ name: _raw, displayName: _truncMapLabel(_raw), ring: i < 2 ? 5 : i < 5 ? 10 : 15 });
+          });
         }
-        // De-duplicate by name, cap at 8
+        // De-duplicate by canonical name, cap at 10
         const seen = new Set();
         const deduped = dots.filter(d => { if (!d.name || seen.has(d.name)) return false; seen.add(d.name); return true; }).slice(0, 10);
 
         // ── Merge geocoded positions if available ──
+        // geoMap keyed by canonical name (same value stored on server-side dot objects)
         if (o._mapDots && Array.isArray(o._mapDots.dots)) {
           const geoMap = {};
           o._mapDots.dots.forEach(g => { geoMap[g.name] = g; });
           deduped.forEach(d => {
-            const geo = geoMap[d.name];
+            const geo = geoMap[d.name]; // canonical-name lookup — never truncated
             if (geo) {
               d.angleDeg     = geo.angleDeg;
               d.distanceMiles= geo.distanceMiles;
@@ -1778,7 +1782,7 @@ function renderOM() {
           const px = _cx + r * Math.cos(angle);
           const py = _cy + r * Math.sin(angle);
           console.log(`MAP DOT [${i}] "${d.name}" | distMi=${d.distanceMiles} angleDeg=${d.angleDeg} | r=${r.toFixed(1)} px=${px.toFixed(1)} py=${py.toFixed(1)}${beyondMax?' BEYOND_MAX':''}`);
-          const estW = d.name.length * 6.2; // approximate text width
+          const estW = (d.displayName || d.name).length * 6.2; // approximate text width
 
           // ── Label placement: side for central dots, above/below for edge dots ──
           let lx, ly, anchor;
@@ -1823,7 +1827,7 @@ function renderOM() {
           const _dotSW     = beyondMax ? '1.5' : '1.5';
           const _dotDash   = beyondMax ? 'stroke-dasharray="3,2"' : '';
           return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${_dotFill}" stroke="${_dotStroke}" stroke-width="${_dotSW}" ${_dotDash} opacity="${beyondMax ? 0.6 : 1}"/>`
-               + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}" opacity="${beyondMax ? 0.6 : 1}">${esc(d.name)}</text>`;
+               + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}" opacity="${beyondMax ? 0.6 : 1}">${esc(d.displayName || d.name)}</text>`;
         }).join('');
       })();
 
