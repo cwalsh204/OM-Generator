@@ -194,7 +194,7 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
       iterations++;
       const response = await anthropic.messages.create({
         model:      'claude-haiku-4-5-20251001',
-        max_tokens: 4000,
+        max_tokens: 8000,
         system:     systemPrompt,
         tools:      anthropicTools,
         messages
@@ -263,7 +263,11 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
             }
           }
 
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText });
+          // Stub the full permits payload so the 84-month array doesn't bloat Haiku's synthesis input
+          const resultForHaiku = JSON.stringify(block.input).includes('residential-permits')
+            ? JSON.stringify({ note: "permits computed in Node — full array omitted from synthesis context" })
+            : resultText;
+          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultForHaiku });
         } catch (toolErr) {
           console.warn(`Tool ${block.name} failed:`, toolErr.message);
           toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `Error: ${toolErr.message}`, is_error: true });
@@ -277,9 +281,20 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
 
     // ── Extract JSON from final text ──
     const jsonMatch = finalText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[0]);
-      if (nodePermits) data.permits = nodePermits;
+    if (!jsonMatch) {
+      console.error('NO JSON MATCH. finalText length:', finalText.length, '| tail:', finalText.slice(-1500));
+      return null;
+    }
+    let data;
+    try {
+      data = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      console.error('PARSE FAILED:', e.message, '| blob length:', jsonMatch[0].length, '| tail:', jsonMatch[0].slice(-1500));
+      return null;
+    }
+    console.log('PARSED KEYS:', Object.keys(data), '| finalText length:', finalText.length);
+    if (nodePermits) data.permits = nodePermits;
+    if (data) {
       console.log('A.CRE data fetched successfully via MCP SDK');
       console.log('Macro environment:', data.economicIndicators?.macroEnvironment);
       // ── Write to Redis (24hr TTL) or fall back to in-memory ──
