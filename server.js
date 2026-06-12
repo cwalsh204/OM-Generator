@@ -455,7 +455,7 @@ async function geocodeMapDots(address, city, state, destinations) {
     console.log(`Property geocoded: ${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`);
 
     // Step 2: Places Text Search for each destination (parallel)
-    const results = await Promise.all(destinations.slice(0,8).map(async dest => {
+    const results = await Promise.all(destinations.slice(0,10).map(async dest => {
       try {
         const r = await fetch(
           `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(`${dest.name} ${city} ${state}`)}&location=${center.lat},${center.lng}&radius=25000&key=${apiKey}`

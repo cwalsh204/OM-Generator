@@ -1734,7 +1734,7 @@ function renderOM() {
         }
         // De-duplicate by name, cap at 8
         const seen = new Set();
-        const deduped = dots.filter(d => { if (!d.name || seen.has(d.name)) return false; seen.add(d.name); return true; }).slice(0, 8);
+        const deduped = dots.filter(d => { if (!d.name || seen.has(d.name)) return false; seen.add(d.name); return true; }).slice(0, 10);
 
         // ── Merge geocoded positions if available ──
         if (o._mapDots && Array.isArray(o._mapDots.dots)) {
@@ -1753,9 +1753,9 @@ function renderOM() {
         return deduped.map((d, i) => ({ ...d, idx: i }));
       };
       const _destinations = _buildMapDots();
-      const _ringR = { 5: 78, 10: 175, 15: 270 };
-      const _ringFill = { 5: '#c9a84c', 10: '#1e3a5f', 15: '#4a90d9' };
       const _cx = 350, _cy = 330;
+      const MAX_MI = 5, OUTER_PX = 270;
+      const _distFill = mi => mi <= 1 ? '#c9a84c' : mi <= 3 ? '#1e3a5f' : '#4a90d9';
       const _hasGeo = o._mapDots && Array.isArray(o._mapDots.dots) && o._mapDots.dots.length > 0;
       const _dotsSVG = (() => {
         const SVG_W = 700, SVG_H = 660, PAD = 14;
@@ -1764,7 +1764,9 @@ function renderOM() {
           const angle = d.angleDeg != null
             ? (d.angleDeg - 90) * Math.PI / 180
             : (i / Math.max(_destinations.length, 1)) * 2 * Math.PI - Math.PI/2;
-          const r = _ringR[d.ring] || 175;
+          const mi = (d.distanceMiles != null) ? d.distanceMiles : MAX_MI;
+          const beyondMax = mi > MAX_MI;
+          const r = Math.min(mi, MAX_MI) / MAX_MI * OUTER_PX;
           const px = _cx + r * Math.cos(angle);
           const py = _cy + r * Math.sin(angle);
           const estW = d.name.length * 6.2; // approximate text width
@@ -1807,15 +1809,19 @@ function renderOM() {
           }
           placed.push({ x: lx, y: ly });
 
-          return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${_ringFill[d.ring]}" stroke="#fff" stroke-width="1.5"/>`
-               + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}">${esc(d.name)}</text>`;
+          const _dotFill   = beyondMax ? 'none' : _distFill(mi);
+          const _dotStroke = beyondMax ? _distFill(MAX_MI) : '#fff';
+          const _dotSW     = beyondMax ? '1.5' : '1.5';
+          const _dotDash   = beyondMax ? 'stroke-dasharray="3,2"' : '';
+          return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${_dotFill}" stroke="${_dotStroke}" stroke-width="${_dotSW}" ${_dotDash} opacity="${beyondMax ? 0.6 : 1}"/>`
+               + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}" opacity="${beyondMax ? 0.6 : 1}">${esc(d.name)}</text>`;
         }).join('');
       })();
 
       return `
       <div class="loc-iso-body">
         <div class="loc-iso-map">
-          <div class="loc-iso-map-title">Drive-Time Reach — ${esc(fullAddress)}${_hasGeo ? '' : ' <span style="font-size:8px;opacity:0.5;font-style:italic;">schematic</span>'}</div>
+          <div class="loc-iso-map-title">Distance Reach — ${esc(fullAddress)}${_hasGeo ? '' : ' <span style="font-size:8px;opacity:0.5;font-style:italic;">schematic</span>'}</div>
           <svg viewBox="0 0 700 660" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <defs>
               <linearGradient id="locIsoBg" x1="0" y1="0" x2="0" y2="1">
@@ -1827,12 +1833,12 @@ function renderOM() {
             <path d="M 0 470 Q 200 440 350 480 Q 500 510 700 480" stroke="#cdd6e0" stroke-width="3" fill="none" opacity="0.55"/>
             <path d="M 350 0 L 365 660" stroke="#cdd6e0" stroke-width="2.5" fill="none" opacity="0.55"/>
             <path d="M 0 330 L 700 320" stroke="#cdd6e0" stroke-width="2" fill="none" opacity="0.5"/>
-            <ellipse cx="350" cy="330" rx="300" ry="260" fill="rgba(74,144,217,0.10)" stroke="rgba(74,144,217,0.45)" stroke-width="1.5" stroke-dasharray="6,4"/>
-            <text x="640" y="200" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="#4a90d9">15 MIN</text>
-            <ellipse cx="350" cy="330" rx="200" ry="170" fill="rgba(30,58,95,0.10)" stroke="rgba(30,58,95,0.55)" stroke-width="1.5" stroke-dasharray="6,4"/>
-            <text x="540" y="220" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="#1e3a5f">10 MIN</text>
-            <ellipse cx="350" cy="330" rx="100" ry="85" fill="rgba(201,168,76,0.18)" stroke="rgba(201,168,76,0.7)" stroke-width="1.5" stroke-dasharray="6,4"/>
-            <text x="442" y="270" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="#a07828">5 MIN</text>
+            <ellipse cx="350" cy="330" rx="270" ry="270" fill="rgba(74,144,217,0.10)" stroke="rgba(74,144,217,0.45)" stroke-width="1.5" stroke-dasharray="6,4"/>
+            <text x="610" y="180" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="#4a90d9">5 MI</text>
+            <ellipse cx="350" cy="330" rx="162" ry="162" fill="rgba(30,58,95,0.10)" stroke="rgba(30,58,95,0.55)" stroke-width="1.5" stroke-dasharray="6,4"/>
+            <text x="503" y="215" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="#1e3a5f">3 MI</text>
+            <ellipse cx="350" cy="330" rx="54" ry="54" fill="rgba(201,168,76,0.18)" stroke="rgba(201,168,76,0.7)" stroke-width="1.5" stroke-dasharray="6,4"/>
+            <text x="396" y="288" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="#a07828">1 MI</text>
             <circle cx="350" cy="330" r="14" fill="#fff" stroke="#c9a84c" stroke-width="3"/>
             <polygon points="350,317 354,328 365,328 356,334 359,345 350,338 341,345 344,334 335,328 346,328" fill="#c9a84c"/>
             <text x="350" y="365" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="13" font-weight="700" fill="#0a1628">${esc(inputs.propName||'Subject Property')}</text>
@@ -1844,10 +1850,10 @@ function renderOM() {
             </g>
           </svg>
           <div class="loc-iso-legend">
-            <div class="loc-iso-legend-title">Drive Time</div>
-            <div class="loc-iso-legend-row"><span class="loc-iso-legend-dot" style="background:rgba(201,168,76,0.7);"></span>5 min — Daily errands</div>
-            <div class="loc-iso-legend-row"><span class="loc-iso-legend-dot" style="background:rgba(30,58,95,0.7);"></span>10 min — Workforce reach</div>
-            <div class="loc-iso-legend-row"><span class="loc-iso-legend-dot" style="background:rgba(74,144,217,0.7);"></span>15 min — Regional</div>
+            <div class="loc-iso-legend-title">Distance</div>
+            <div class="loc-iso-legend-row"><span class="loc-iso-legend-dot" style="background:rgba(201,168,76,0.7);"></span>1 mi — Walking distance</div>
+            <div class="loc-iso-legend-row"><span class="loc-iso-legend-dot" style="background:rgba(30,58,95,0.7);"></span>3 mi — Neighborhood</div>
+            <div class="loc-iso-legend-row"><span class="loc-iso-legend-dot" style="background:rgba(74,144,217,0.7);"></span>5 mi — Regional</div>
           </div>
         </div>
         <div class="loc-iso-side">
