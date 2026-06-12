@@ -176,11 +176,29 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 
     try {
       const rD = JSON.parse(extractText(ratesRaw));
+      const _rawBuckets = rD?.data?.cre_loan_pricing?.agency_mf?.buckets ?? null;
+      const _t10 = rD?.data?.treasury_yields?.yields?.['10Y']?.rate ?? null;
+      // Derive freddieMFRate: treasury_10y + avg spread_wavg_bps across the two standard
+      // agency LTV buckets (55–65% and 65–80%); excludes ≤55% low-leverage bucket
+      let _freddieMFRate = null;
+      if (Array.isArray(_rawBuckets) && _t10 != null) {
+        const tenYr  = _rawBuckets.filter(b => b.term_years === 10);
+        const matched = tenYr.filter(b =>
+          (b.ltv_min === 0.55 && b.ltv_max === 0.65) ||
+          (b.ltv_min === 0.65 && b.ltv_max === 0.80)
+        );
+        if (matched.length > 0) {
+          const avgSpreadBps = matched.reduce((s, b) => s + b.spread_wavg_bps, 0) / matched.length;
+          _freddieMFRate = +(_t10 + avgSpreadBps / 100).toFixed(2);
+          console.log(`freddieMFRate: t10=${_t10} + avgSpread=${avgSpreadBps.toFixed(1)}bps = ${_freddieMFRate}`);
+        }
+      }
       nodeRates = {
-        treasury_10y: rD?.data?.treasury_yields?.yields?.['10Y']?.rate ?? null,
-        treasury_5y:  rD?.data?.treasury_yields?.yields?.['5Y']?.rate  ?? null,
-        sofr:         rD?.data?.market_rates?.rates?.sofr_daily?.rate  ?? null,
-        rateSheet:    rD?.data?.cre_loan_pricing?.agency_mf?.buckets   ?? null
+        treasury_10y:  _t10,
+        treasury_5y:   rD?.data?.treasury_yields?.yields?.['5Y']?.rate ?? null,
+        sofr:          rD?.data?.market_rates?.rates?.sofr_daily?.rate  ?? null,
+        freddieMFRate: _freddieMFRate,
+        rateSheet:     _rawBuckets
       };
     } catch (e) { console.warn('Rates parse failed:', e.message); }
 
@@ -258,8 +276,7 @@ Return ONLY a JSON object — no preamble, no markdown:
 {
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "povertyRate": number|null, "povertyRatePercentile": number|null, "renterOccupiedPct": number|null, "renterOccupiedPercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
   "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
-  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number },
-  "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
+  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number }
 }`;
 
     const synthResponse = await anthropic.messages.create({
@@ -289,6 +306,22 @@ Return ONLY a JSON object — no preamble, no markdown:
     // ── Stage 4: Inject all Node-mapped values ──
     data.rates   = nodeRates;
     data.permits = nodePermits;
+
+    // Map ACRE snake_case buckets → frontend camelCase rateSheet.rows (overwrites any Haiku rateSheet)
+    if (Array.isArray(nodeRates.rateSheet) && nodeRates.rateSheet.length > 0) {
+      data.rateSheet = {
+        rows: nodeRates.rateSheet.map(b => ({
+          term:          b.term_bucket   != null ? String(b.term_bucket)               : null,
+          ltvBucket:     b.ltv_bucket    != null ? String(b.ltv_bucket)               : null,
+          rateRangeLow:  b.rate_min      != null ? parseFloat(b.rate_min)              : null,
+          rateRangeHigh: b.rate_max      != null ? parseFloat(b.rate_max)              : null,
+          spreadBps:     b.spread_wavg_bps != null ? Number(b.spread_wavg_bps)        : null,
+          sampleLoans:   b.sample_size   != null ? Number(b.sample_size)              : null,
+          confidence:    b.confidence    != null ? String(b.confidence).toLowerCase() : null
+        }))
+      };
+      console.log(`Node rateSheet: ${data.rateSheet.rows.length} rows mapped, freddieMFRate=${nodeRates.freddieMFRate}`);
+    }
     if (data.employment) data.employment.empCAGR5y = nodeEmpCAGR5y;
     if (data.economicIndicators) {
       data.economicIndicators.drtscilmValue     = nodeDRTSCILM;
