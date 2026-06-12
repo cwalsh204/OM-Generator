@@ -1777,6 +1777,7 @@ function renderOM() {
           const r = Math.min(mi, MAX_MI) / MAX_MI * OUTER_PX;
           const px = _cx + r * Math.cos(angle);
           const py = _cy + r * Math.sin(angle);
+          console.log(`MAP DOT [${i}] "${d.name}" | distMi=${d.distanceMiles} angleDeg=${d.angleDeg} | r=${r.toFixed(1)} px=${px.toFixed(1)} py=${py.toFixed(1)}${beyondMax?' BEYOND_MAX':''}`);
           const estW = d.name.length * 6.2; // approximate text width
 
           // ── Label placement: side for central dots, above/below for edge dots ──

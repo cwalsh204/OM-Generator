@@ -1293,6 +1293,7 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
   const fileType = req.body.fileType || "t12";
   const filename = req.file.originalname || "uploaded_file";
   console.log(`Parsing file: ${filename}, type: ${fileType}, size: ${req.file.size} bytes`);
+  if (fileType === 'rentRoll') console.log('RENTROLL DETECTED:', filename, fileType);
 
   // CSV handling
   if (filename.toLowerCase().endsWith(".csv")) {
