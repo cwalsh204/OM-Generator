@@ -1339,11 +1339,25 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
 
       if (json.length === 0) return;
 
+      // Normalize a raw header for keyword matching: strip Excel _x000D_ and line-break artifacts
+      const _normH = h => String(h||'').replace(/_x000D_/g,'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').toLowerCase().trim();
+
       let headerRow = 0;
-      for (let i = 0; i < Math.min(15, json.length); i++) {
-        const nonEmpty = json[i].filter(c => c && String(c).trim());
-        if (nonEmpty.length >= 2 && nonEmpty.some(c => /[a-zA-Z]/.test(String(c)))) {
-          headerRow = i; break;
+      if (fileType === 'rentRoll') {
+        // Rent roll files often have metadata rows above the real header.
+        // Find the first row that contains BOTH a rent keyword AND a unit/type keyword.
+        for (let i = 0; i < Math.min(25, json.length); i++) {
+          const rowNorm = json[i].map(_normH);
+          const hasRent = rowNorm.some(c => /leased|market|rent|effective|contract/.test(c));
+          const hasUnit = rowNorm.some(c => /\bunit\b|floorplan|floor\s*plan|\btype\b|\bbed\b/.test(c));
+          if (hasRent && hasUnit) { headerRow = i; break; }
+        }
+      } else {
+        for (let i = 0; i < Math.min(15, json.length); i++) {
+          const nonEmpty = json[i].filter(c => c && String(c).trim());
+          if (nonEmpty.length >= 2 && nonEmpty.some(c => /[a-zA-Z]/.test(String(c)))) {
+            headerRow = i; break;
+          }
         }
       }
 
@@ -1433,36 +1447,77 @@ Summary: up to 8 key financial figures with formatted values.`
     const parsed = extractJSON(text);
     console.log(`Column mapping success. Mappings: ${Object.keys(parsed.mappings || {}).length}`);
 
-    // ── For rent roll: extract exact average leased rent from totals row in code (no Claude inference) ──
+    // ── Rent roll: deterministic in-place vs market column extraction ──
     if (fileType === 'rentRoll' && allRows && headers) {
-      // Find column index whose header matches any known rent column naming convention
-      const rentColIdx = headers.findIndex(h =>
-        /avg(erage)?\s*(leased|in.?place|current|actual)\s*rent/i.test(h) ||
-        /in.?place\s*rent/i.test(h) ||
-        /leased\s*(rent|amt)/i.test(h) ||
-        /avg\s*rent/i.test(h) ||
-        /avg(erage)?\s*monthly\s*rent/i.test(h) ||
-        /contract\s*rent/i.test(h) ||
-        /effective\s*rent/i.test(h) ||
-        /rent\s*\/?\s*unit/i.test(h) ||
-        /current\s*monthly/i.test(h) ||
-        /asking\s*rent/i.test(h)
-      );
-      // Find the last totals/averages row — scan any cell in the row, not just column A
+      // Step 1: normalize all headers (strip Excel artifacts, collapse whitespace, lowercase)
+      const normH = h => String(h||'').replace(/_x000D_/g,'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').toLowerCase().trim();
+      const normHeaders = headers.map(normH);
+      console.log(`Rent roll normalized headers: ${JSON.stringify(normHeaders)}`);
+
+      // Step 2: market exclusion guard — these headers are NEVER in-place
+      const isMarket = h => /market|asking|pro.?forma|potential|street/.test(h);
+
+      // Step 3: in-place column — priority order, first match wins, market-excluded
+      const inPlacePatterns = [/in.?place/, /\bleased\b/, /\bactual\b/, /\beffective\b/, /\bcontract\b/, /current\s*rent/];
+      let inPlaceIdx = -1;
+      for (const pat of inPlacePatterns) {
+        const idx = normHeaders.findIndex(h => pat.test(h) && !isMarket(h));
+        if (idx >= 0) { inPlaceIdx = idx; break; }
+      }
+
+      // Step 4: market column
+      const marketIdx = normHeaders.findIndex(h => /market|asking|pro.?forma|potential/.test(h));
+
+      console.log(`Rent roll cols: in-place=${inPlaceIdx} ("${headers[inPlaceIdx]||'none'}"), market=${marketIdx} ("${headers[marketIdx]||'none'}")`);
+
+      // Step 5: totals/averages row (scan every cell, not just col A)
       const totalsRow = [...allRows].reverse().find(r =>
         r.some(cell =>
           /^(total|totals|average|averages|totals\s*\/\s*averages|grand\s*total|all\s*units|overall|summary|portfolio\s*total|avg\s*all|weighted\s*avg)$/i
-            .test(String(cell || '').trim())
+            .test(String(cell||'').trim())
         )
       );
-      if (rentColIdx >= 0 && totalsRow) {
-        const raw = String(totalsRow[rentColIdx] || '').replace(/[$,\s]/g, '');
-        const val = parseFloat(raw);
-        if (!isNaN(val) && val > 100) {
-          parsed.summary = parsed.summary || {};
-          parsed.summary['Average Rent'] = `$${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-          console.log(`Rent roll: extracted exact avg leased rent = $${val} from col ${rentColIdx} ("${headers[rentColIdx]}")`);
+
+      const parseVal = raw => {
+        const n = parseFloat(String(raw||'').replace(/[$,\s]/g,''));
+        return (!isNaN(n) && n > 100) ? n : null;
+      };
+
+      // Step 6: in-place value — totals row first, fall back to computed average
+      let inPlaceVal = null;
+      if (inPlaceIdx >= 0) {
+        if (totalsRow) {
+          inPlaceVal = parseVal(totalsRow[inPlaceIdx]);
         }
+        if (inPlaceVal == null) {
+          // No totals row — average across unit rows, skip vacant/zero-rent and summary rows
+          const isTotalsLike = r => r.some(cell => /^(total|average|summary|portfolio)/i.test(String(cell||'').trim()));
+          const vals = allRows
+            .filter(r => !isTotalsLike(r))
+            .map(r => parseVal(r[inPlaceIdx]))
+            .filter(v => v != null);
+          if (vals.length > 0) {
+            inPlaceVal = Math.round(vals.reduce((s,v) => s+v, 0) / vals.length);
+            console.log(`Rent roll: computed avg from ${vals.length} unit rows (no totals row found)`);
+          }
+        }
+      }
+
+      // Step 7: market value from totals row
+      let marketVal = null;
+      if (marketIdx >= 0 && totalsRow) {
+        marketVal = parseVal(totalsRow[marketIdx]);
+      }
+
+      // Step 8: write to canonical keys — never overwrite with market value
+      parsed.summary = parsed.summary || {};
+      if (inPlaceVal != null) {
+        parsed.summary['Average In-Place Rent'] = `$${Math.round(inPlaceVal).toLocaleString('en-US')}`;
+        console.log(`Rent roll: in-place = $${Math.round(inPlaceVal)} (col ${inPlaceIdx}, "${headers[inPlaceIdx]}")`);
+      }
+      if (marketVal != null) {
+        parsed.summary['Market Rent'] = `$${Math.round(marketVal).toLocaleString('en-US')}`;
+        console.log(`Rent roll: market = $${Math.round(marketVal)} (col ${marketIdx}, "${headers[marketIdx]}")`);
       }
     }
 

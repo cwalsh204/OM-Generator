@@ -1116,12 +1116,10 @@ function renderOM() {
   // ── avg rent & units ──
   const numUnits = parseInt(String(inputs.totalUnits||'0').replace(/[^0-9]/g,''))||0;
   const _safeMonthly = v => { const n = parseFloat(String(v||'0').replace(/[^0-9.]/g,'')); return n > 100 ? n : 0; };
-  const _inPlaceNum = 0;
   const rrs = parsedFiles.rentRoll?.summary || {};
-  const _rrEntry = Object.entries(rrs).find(([k,v]) => /rent|avg/i.test(k) && _safeMonthly(v) > 0);
-  const avgRent = _inPlaceNum > 0 ? fmtCur(_inPlaceNum)
-    : _rrEntry ? fmtCur(_safeMonthly(_rrEntry[1]))
-    : '—';
+  // Read the canonical in-place key written by server-side deterministic extractor
+  const _inPlaceNum = _safeMonthly(rrs['Average In-Place Rent']);
+  const avgRent = _inPlaceNum > 0 ? fmtCur(_inPlaceNum) : '—';
 
   // ── top sectors ──
   const topSectors = a.employment?.qcew?.top_sectors?.slice(0,5) || [];
@@ -1388,7 +1386,7 @@ function renderOM() {
         const _noiN     = _p(inputs.noi);
         const _pfNoiN   = _p(inputs.proFormaNOI);
         const _occN     = _p(inputs.occupancy);
-        const _inPlaceRent = _rrEntry ? _safeMonthly(_rrEntry[1]) : 0;
+        const _inPlaceRent = _inPlaceNum > 0 ? _inPlaceNum : 0;
         const _spreadBps = _p(inputs.estSpread) || 170;
         const _baseRate  = +(t10 + _spreadBps/100).toFixed(4) / 100;
         const _amortYears = (() => { const s=String(inputs.amortization||''); if(/interest only|IO/i.test(s)) return 0; const n=parseInt(s.replace(/[^0-9]/g,'')); return n||30; })();
@@ -2016,7 +2014,8 @@ function renderOM() {
       const empYoY    = a.employment?.yoy_growth ?? a.employment?.qcew?.yoy_growth ?? null;
       const empYoYPct = a.employment?.yoy_growth_percentile ?? null;
       const zipUnemp  = a.employment?.zipUnemploymentRate ?? null;
-      const empCAGR10y= a.employment?.empCAGR10y ?? null;
+      const empCAGR10y    = a.employment?.empCAGR10y ?? null;
+      const empCAGR10yPct = empCAGR10y != null ? +(empCAGR10y * 100).toFixed(1) : null;
 
       const spiScore  = a.permits?.supply_pressure_index?.current_score ?? null;
       const spiPct    = a.permits?.supply_pressure_index?.national_percentile ?? null;
@@ -2127,8 +2126,8 @@ function renderOM() {
           </div>
           <div class="p1-metric">
             <span class="p1-metric-label">10-Yr Employment CAGR</span>
-            <span class="p1-metric-val">${empCAGR10y!=null ? fmtPct(empCAGR10y) : '—'}</span>
-            <div class="p1-bar-row">${bar(empYoYPct)}<div class="p1-rank">${empCAGR10y!=null?(empCAGR10y>=2?'Strong':empCAGR10y>=1?'Moderate':empCAGR10y>=0?'Flat':'Contracting'):'—'}</div></div>
+            <span class="p1-metric-val">${empCAGR10yPct!=null ? fmtPct(empCAGR10yPct) : '—'}</span>
+            <div class="p1-bar-row">${bar(empYoYPct)}<div class="p1-rank">${empCAGR10yPct!=null?(empCAGR10yPct>=2?'Strong':empCAGR10yPct>=1?'Moderate':empCAGR10yPct>=0?'Flat':'Contracting'):'—'}</div></div>
           </div>
           <div class="p1-quad-takeaway">${esc(o.marketEmploymentNarrativeShort||capTakeaway(o.marketEmploymentNarrative||''))}</div>
         </div>
