@@ -202,10 +202,51 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
       };
     } catch (e) { console.warn('Rates parse failed:', e.message); }
 
+    // ── Employment: all Node-mapped fields ──
+    let countyEmployment   = null;
+    let topSectorsByEmployment = [];
+    let sectorsVsCounty    = [];
+    let qcewLatestYear     = null;
+
+    const NAICS = {
+      '11':'Agriculture, Forestry, Fishing & Hunting',
+      '21':'Mining, Quarrying, Oil & Gas',  '22':'Utilities',
+      '23':'Construction',
+      '31':'Manufacturing', '32':'Manufacturing', '33':'Manufacturing',
+      '42':'Wholesale Trade',
+      '44':'Retail Trade',  '45':'Retail Trade',
+      '48':'Transportation & Warehousing', '49':'Transportation & Warehousing',
+      '51':'Information',   '52':'Finance & Insurance',
+      '53':'Real Estate & Rental & Leasing',
+      '54':'Professional, Scientific & Technical Services',
+      '55':'Management of Companies & Enterprises',
+      '56':'Administrative, Support & Waste Management',
+      '61':'Educational Services',
+      '62':'Health Care & Social Assistance',
+      '71':'Arts, Entertainment & Recreation',
+      '72':'Accommodation & Food Services',
+      '81':'Other Services',  '92':'Public Administration'
+    };
+
     try {
-      const eD = JSON.parse(extractText(employmentRaw));
-      nodeEmpCAGR5y = eD?.data?.county?.long_range_trends?.employment?.cagr_5y ?? null;
-    } catch (e) { console.warn('Employment CAGR parse failed:', e.message); }
+      const eD = JSON.parse(extractText(employmentRaw)).data;
+      nodeEmpCAGR5y      = eD?.county?.long_range_trends?.employment?.cagr_5y ?? null;
+      countyEmployment   = eD?.county?.latest_laus?.employment                ?? null;
+
+      topSectorsByEmployment = (eD?.county?.top_industries ?? [])
+        .map(s => ({ name: NAICS[String(s.naics)] ?? String(s.naics), employees: s.employment, lq: s.lq }))
+        .slice(0, 5);
+
+      // establishment_share arrives as decimal (0.2386 = 23.86%) — multiply by 100 for renderer
+      sectorsVsCounty = (eD?.zip?.industry_fingerprint?.top_sectors ?? [])
+        .map(s => ({ name: s.name, share: s.establishment_share != null ? +(s.establishment_share * 100).toFixed(2) : null, vsCounty: s.vs_county ?? null }));
+
+      // Extract year from e.g. "2025-Q3" → "2025"
+      const qcewRaw = eD?.county?.data_freshness?.qcew_latest ?? null;
+      qcewLatestYear = qcewRaw ? String(qcewRaw).slice(0, 4) : null;
+
+      console.log(`Employment mapped: county=${countyEmployment}, sectors=${topSectorsByEmployment.length}, vsCounty=${sectorsVsCounty.length}, qcew=${qcewLatestYear}, cagr5y=${nodeEmpCAGR5y}`);
+    } catch (e) { console.warn('Employment parse failed:', e.message); }
 
     try {
       const ecD = JSON.parse(extractText(econRaw));
@@ -275,7 +316,7 @@ ${extractText(econRaw).slice(0, 6000)}
 Return ONLY a JSON object — no preamble, no markdown:
 {
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "povertyRate": number|null, "povertyRatePercentile": number|null, "renterOccupiedPct": number|null, "renterOccupiedPercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
-  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
+  "employment": { "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number }
 }`;
 
@@ -322,7 +363,22 @@ Return ONLY a JSON object — no preamble, no markdown:
       };
       console.log(`Node rateSheet: ${data.rateSheet.rows.length} rows mapped, freddieMFRate=${nodeRates.freddieMFRate}`);
     }
-    if (data.employment) data.employment.empCAGR5y = nodeEmpCAGR5y;
+    // ── Employment Node injection (flat format — normalization converts to nested downstream) ──
+    if (data.employment) {
+      data.employment.empCAGR5y       = nodeEmpCAGR5y;
+      data.employment.totalJobs       = countyEmployment;
+      data.employment.totalEmployment = countyEmployment;
+      // Override Haiku's topSectors with NAICS-resolved county data
+      if (topSectorsByEmployment.length > 0) {
+        data.employment.topSectors = topSectorsByEmployment.map(s => ({
+          name: s.name, employees: s.employees, share: null, ratio: null
+        }));
+      }
+      // vs-county bar chart source (separate from topSectors — ZIP fingerprint)
+      data.employment._sectorsVsCounty = sectorsVsCounty;
+      // QCEW vintage year for panel header
+      if (qcewLatestYear) data.employment.qcew_latest_year = qcewLatestYear;
+    }
     if (data.economicIndicators) {
       data.economicIndicators.drtscilmValue     = nodeDRTSCILM;
       data.economicIndicators.drtscilmTrend     = nodeDRTSCILMTrend
@@ -1027,12 +1083,11 @@ app.post("/api/generate", async (req, res) => {
       const e = acreData.employment;
       acreData.employment = {
         laus: { unemployment_rate: e.unemploymentRate || null },
-        sectors: (e.topSectors || []).map(s => ({
-          label: s.name,
-          employment_count: s.employees,
-          share: s.share ?? null,
-          ratio: s.ratio ?? null
-        })),
+        // Prefer ZIP fingerprint array (establishment_share + vs_county) for bar chart;
+        // fall back to topSectors if ZIP data absent (low-confidence ZIPs)
+        sectors: (e._sectorsVsCounty && e._sectorsVsCounty.length > 0)
+          ? e._sectorsVsCounty.map(s => ({ label: s.name, share: s.share, ratio: s.vsCounty }))
+          : (e.topSectors || []).map(s => ({ label: s.name, employment_count: s.employees, share: s.share ?? null, ratio: s.ratio ?? null })),
         qcew: {
           top_sectors: (e.topSectors || []).map(s => ({
             sector_name:      s.name,
@@ -1061,7 +1116,8 @@ app.post("/api/generate", async (req, res) => {
         empCAGR5y:           e.empCAGR5y            ?? null,
         empCAGR10y:          e.empCAGR10y           ?? null,
         covidRecoveryMonths: e.covidRecoveryMonths  ?? null,
-        trendDirection:      e.trendDirection       ?? null
+        trendDirection:      e.trendDirection       ?? null,
+        qcew_latest_year:    e.qcew_latest_year     ?? null
       };
     }
     // permits are computed in Node during the tool loop (nodePermits) and injected into data before caching

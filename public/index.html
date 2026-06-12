@@ -2238,7 +2238,7 @@ function renderOM() {
             <div class="p2-mini-stat-label">MF Permits YTD</div>
           </div>
           <div class="p2-mini-stat" style="border-left:1px solid var(--om-border);padding-left:28px;">
-            ${(() => { const cagr5 = a.employment?.empCAGR5y ?? null; return `<div class="p2-mini-stat-val ${cagr5!=null && cagr5>0 ? '' : 'red'}">${cagr5!=null ? (cagr5>0?'+':'')+Number(cagr5).toFixed(1)+'%' : '—'}</div>`; })()}
+            ${(() => { const cagr5 = a.employment?.empCAGR5y ?? null; const cagr5pct = cagr5 != null ? +(cagr5 * 100).toFixed(1) : null; return `<div class="p2-mini-stat-val ${cagr5pct!=null && cagr5pct>0 ? '' : 'red'}">${cagr5pct!=null ? (cagr5pct>0?'+':'')+cagr5pct.toFixed(1)+'%' : '—'}</div>`; })()}
             <div class="p2-mini-stat-label">5-Yr Emp. CAGR</div>
           </div>
         </div>
@@ -2279,7 +2279,7 @@ function renderOM() {
             </div>
           </div>
           <div class="p2-sectors">
-            <div class="p2-sectors-head">Top Employment Sectors · ${empYears[empYears.length-1]}</div>
+            <div class="p2-sectors-head">Top Employment Sectors · ${a.employment?.qcew_latest_year || empYears[empYears.length-1]}</div>
             ${topSectors.slice(0,5).map((s,i)=>{
               const cnt=s.employment_count||0;
               const w=Math.round((cnt/topMax)*100);
@@ -2649,7 +2649,11 @@ function initOMCharts(o, a, rates, T12, _totalRentalCalc) {
   // ── Employment concentration horizontal bar chart ────────────────
   (() => {
     const rawSectors = (a.employment?.sectors || []).filter(s => s.share != null);
-    if (!rawSectors.length) return;
+    if (!rawSectors.length) {
+      const _el = document.getElementById('chart-emp-concentration');
+      if (_el) { const _p = _el.parentElement; if (_p) _p.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8FA8C0;font-size:11px;font-style:italic;">Establishment data unavailable for this ZIP</div>'; }
+      return;
+    }
     const sectors = rawSectors.sort((x, y) => (y.share||0) - (x.share||0)).slice(0, 5);
     const barColors = sectors.map(s =>
       (s.ratio||0) >= 2.0 ? '#1D9E75' :
