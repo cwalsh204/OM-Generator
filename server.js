@@ -472,6 +472,7 @@ async function geocodeMapDots(address, city, state, destinations) {
 
     const dots = results.filter(Boolean);
     console.log(`Geocoded ${dots.length}/${destinations.length} map destinations`);
+    console.log('MAP DOTS:', JSON.stringify(dots.map(d => ({ name: d.name, angleDeg: d.angleDeg, distanceMiles: d.distanceMiles }))));
     return { dots };
   } catch(e) {
     console.warn('geocodeMapDots failed:', e.message); return null;
