@@ -171,7 +171,8 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
     // ── Stage 2: Node mappings — deterministic, no LLM arithmetic ──
     let nodeRates = { treasury_10y: null, treasury_5y: null, sofr: null, rateSheet: null };
     let nodeEmpCAGR5y = null;
-    let nodeDRTSCILM = null, nodeDRTSCILMTrend = null, nodeUMCSENT = null;
+    let nodeDRTSCILM = null, nodeDRTSCILMTrend = null, nodeDRTSCILMPctile = null;
+    let nodeUMCSENT = null, nodeUMCSENTPctile = null;
     let nodePermits = null;
 
     try {
@@ -250,9 +251,11 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 
     try {
       const ecD = JSON.parse(extractText(econRaw));
-      nodeDRTSCILM      = ecD?.data?.series?.DRTSCILM?.latest?.value           ?? null;
-      nodeDRTSCILMTrend = ecD?.data?.series?.DRTSCILM?.latest?.trend_direction ?? null;
-      nodeUMCSENT       = ecD?.data?.series?.UMCSENT?.latest?.value            ?? null;
+      nodeDRTSCILM       = ecD?.data?.series?.DRTSCILM?.latest?.value            ?? null;
+      nodeDRTSCILMTrend  = ecD?.data?.series?.DRTSCILM?.latest?.trend_direction ?? null;
+      nodeDRTSCILMPctile = ecD?.data?.series?.DRTSCILM?.latest?.pctile_yoy_5yr  ?? null;
+      nodeUMCSENT        = ecD?.data?.series?.UMCSENT?.latest?.value             ?? null;
+      nodeUMCSENTPctile  = ecD?.data?.series?.UMCSENT?.latest?.pctile_yoy_5yr   ?? null;
     } catch (e) { console.warn('Econ indicators parse failed:', e.message); }
 
     // ── Permits: compute in Node from raw response ──
@@ -282,7 +285,7 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
                 .slice(-5)
                 .map(([year, units]) => ({ year: Number(year), units })),
               ...(byYear[currentYear]
-                ? [{ year: `${currentYear} YTD`, units: byYear[currentYear] }]
+                ? [{ year: currentYear, units: byYear[currentYear] }]
                 : [])
             ]
           }
@@ -385,7 +388,9 @@ Return ONLY a JSON object — no preamble, no markdown:
         ? (nodeDRTSCILMTrend.toLowerCase().includes('tighten') ? 'tightening'
           : nodeDRTSCILMTrend.toLowerCase().includes('loosen') ? 'loosening' : 'neutral')
         : null;
-      data.economicIndicators.consumerConfidence = nodeUMCSENT;
+      data.economicIndicators.consumerConfidence           = nodeUMCSENT;
+      data.economicIndicators.drtscilmPctile5yr            = nodeDRTSCILMPctile;
+      data.economicIndicators.consumerConfidencePercentile = nodeUMCSENTPctile;
     }
 
     if (data) {
