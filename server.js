@@ -157,16 +157,18 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 
     // ── Stage 1: Hardcoded parallel fetches — no LLM path selection ──
     const fullAddress = `${address}, ${city}, ${state}${zip ? ' ' + zip : ''}`;
-    console.log(`Fetching 5 A.CRE data sources in parallel for: ${fullAddress}`);
+    console.log(`Fetching 7 A.CRE data sources in parallel for: ${fullAddress}`);
 
-    const [ratesRaw, censusRaw, employmentRaw, permitsRaw, econRaw] = await Promise.all([
-      mcp.callTool({ name: 'query_data', arguments: { source: 'rates',               path: '/v1/analyze',     method: 'POST', body: { include_curve: true } } }),
-      mcp.callTool({ name: 'query_data', arguments: { source: 'census',              path: '/census/analyze', method: 'POST', body: { address: fullAddress } } }),
-      mcp.callTool({ name: 'query_data', arguments: { source: 'employment',          path: '/api/v1/analyze', method: 'POST', body: { address: fullAddress } } }),
-      mcp.callTool({ name: 'query_data', arguments: { source: 'residential-permits', path: '/api/v1/analyze', method: 'POST', body: { address: fullAddress, include_history_months: 84 } } }),
-      mcp.callTool({ name: 'query_data', arguments: { source: 'economic-indicators', path: '/api/v1/analyze', method: 'POST', body: { categories: ['general_inflation','credit_cycle','consumer','recession_signals'] } } }),
+    const [ratesRaw, census1Raw, census3Raw, census5Raw, employmentRaw, permitsRaw, econRaw] = await Promise.all([
+      mcp.callTool({ name: 'query_data', arguments: { source: 'rates',               path: '/v1/analyze',          method: 'POST', body: { include_curve: true } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'census',              path: '/census/analyze-radius', method: 'POST', body: { address: fullAddress, radius_miles: 1 } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'census',              path: '/census/analyze-radius', method: 'POST', body: { address: fullAddress, radius_miles: 3 } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'census',              path: '/census/analyze-radius', method: 'POST', body: { address: fullAddress, radius_miles: 5 } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'employment',          path: '/api/v1/analyze',      method: 'POST', body: { address: fullAddress } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'residential-permits', path: '/api/v1/analyze',      method: 'POST', body: { address: fullAddress, include_history_months: 84 } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'economic-indicators', path: '/api/v1/analyze',      method: 'POST', body: { categories: ['general_inflation','credit_cycle','consumer','recession_signals'] } } }),
     ]);
-    console.log('A.CRE parallel fetches complete');
+    console.log('A.CRE parallel fetches complete (7 sources)');
 
     // ── Stage 2: Node mappings — deterministic, no LLM arithmetic ──
     let nodeRates = { treasury_10y: null, treasury_5y: null, sofr: null, rateSheet: null };
@@ -174,6 +176,29 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
     let nodeDRTSCILM = null, nodeDRTSCILMTrend = null, nodeDRTSCILMPctile = null;
     let nodeUMCSENT = null, nodeUMCSENTPctile = null;
     let nodePermits = null;
+    let nodeRing1 = null, nodeRing3 = null, nodeRing5 = null;
+
+    // ── Census radius helper — extracts four card fields + percentiles (ring1 only) ──
+    const ringFrom = (raw, includePercentiles = false) => {
+      try {
+        const d = JSON.parse(extractText(raw))?.data;
+        if (!d) return null;
+        const result = {
+          population:   Math.round(d.demographics?.total_population ?? 0) || null,
+          households:   d.demographics?.total_households             ?? null,
+          medianIncome: Math.round(d.economics?.median_hh_income     ?? 0) || null,
+          renterPct:    d.housing?.pct_renter_occupied               ?? null,
+          blockGroups:  d.coverage?.block_groups_analyzed            ?? null
+        };
+        if (includePercentiles) {
+          result.incomePercentileRank     = d.economics?.median_hh_income_percentile        ?? null;
+          result.educationPercentile      = d.education?.pct_bachelors_or_higher_percentile ?? null;
+          result.povertyRatePercentile    = d.economics?.poverty_rate_percentile            ?? null;
+          result.renterOccupiedPercentile = d.housing?.pct_renter_occupied_percentile       ?? null;
+        }
+        return result;
+      } catch (e) { console.warn('ringFrom parse failed:', e.message); return null; }
+    };
 
     try {
       const rD = JSON.parse(extractText(ratesRaw));
@@ -294,6 +319,16 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
       }
     } catch (e) { console.warn('Permits parse failed:', e.message); }
 
+    // ── Census radius rings (Node-mapped, no LLM) ──
+    nodeRing1 = ringFrom(census1Raw, true);
+    nodeRing3 = ringFrom(census3Raw);
+    nodeRing5 = ringFrom(census5Raw);
+    console.log('Node census rings:', JSON.stringify({
+      r1: { pop: nodeRing1?.population, hh: nodeRing1?.households, hhi: nodeRing1?.medianIncome, bg: nodeRing1?.blockGroups },
+      r3: { pop: nodeRing3?.population, hh: nodeRing3?.households, bg: nodeRing3?.blockGroups },
+      r5: { pop: nodeRing5?.population, hh: nodeRing5?.households, bg: nodeRing5?.blockGroups }
+    }));
+
     // ── Diagnostic ──
     console.log('EXTRACT CHECK:', extractText(ratesRaw).slice(0, 200));
     console.log('NODE VALUES:', JSON.stringify({ nodeRates, nodeEmpCAGR5y, nodeDRTSCILM, nodeUMCSENT }));
@@ -305,8 +340,8 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
 RATES:
 ${extractText(ratesRaw).slice(0, 4000)}
 
-CENSUS:
-${extractText(censusRaw).slice(0, 8000)}
+CENSUS (1-mile radius — numeric/percentile fields are Node-mapped; read only prose, growth, age, poverty):
+${extractText(census1Raw).slice(0, 5000)}
 
 EMPLOYMENT:
 ${extractText(employmentRaw).slice(0, 8000)}
@@ -318,7 +353,7 @@ ${extractText(econRaw).slice(0, 6000)}
 
 Return ONLY a JSON object — no preamble, no markdown:
 {
-  "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "povertyRate": number|null, "povertyRatePercentile": number|null, "renterOccupiedPct": number|null, "renterOccupiedPercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
+  "census": { "educationRate": number, "medianAge": number, "populationGrowth": number, "populationGrowthPercentile": number, "povertyRate": number|null },
   "employment": { "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
   "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number }
 }`;
@@ -350,6 +385,19 @@ Return ONLY a JSON object — no preamble, no markdown:
     // ── Stage 4: Inject all Node-mapped values ──
     data.rates   = nodeRates;
     data.permits = nodePermits;
+
+    // Node-mapped census rings — overrides all Haiku census number fields
+    data.census = data.census || {};
+    data.census.population               = nodeRing1?.population              ?? null;
+    data.census.households               = nodeRing1?.households              ?? null;
+    data.census.medianIncome             = nodeRing1?.medianIncome            ?? null;
+    data.census.renterPct                = nodeRing1?.renterPct               ?? null;
+    data.census.incomePercentileRank     = nodeRing1?.incomePercentileRank    ?? null;
+    data.census.educationPercentile      = nodeRing1?.educationPercentile     ?? null;
+    data.census.povertyRatePercentile    = nodeRing1?.povertyRatePercentile   ?? null;
+    data.census.renterOccupiedPercentile = nodeRing1?.renterOccupiedPercentile ?? null;
+    data.census.ring3 = nodeRing3 ? { pop: nodeRing3.population, households: nodeRing3.households, medianIncome: nodeRing3.medianIncome, renterPct: nodeRing3.renterPct } : null;
+    data.census.ring5 = nodeRing5 ? { pop: nodeRing5.population, households: nodeRing5.households, medianIncome: nodeRing5.medianIncome, renterPct: nodeRing5.renterPct } : null;
 
     // Map ACRE snake_case buckets → frontend camelCase rateSheet.rows (overwrites any Haiku rateSheet)
     if (Array.isArray(nodeRates.rateSheet) && nodeRates.rateSheet.length > 0) {
@@ -1066,7 +1114,19 @@ app.post("/api/generate", async (req, res) => {
     console.log("Rate sources:", JSON.stringify(rateSources));
 
     // ── Normalize acreData flat → nested for frontend (buildDataContext has already consumed flat keys) ──
+    // NOTE: stash/restore flat ring keys before overwrite — normalization replaces acreData.census entirely.
+    // Follow-up: refactor to mutate acreData.census.demographics = {} instead of replacing, so stash is unnecessary.
     if (acreData.census && !acreData.census.demographics) {
+      const _r1pop   = acreData.census.population;
+      const _r1hhi   = acreData.census.medianIncome;
+      const _r1hh    = acreData.census.households;
+      const _r1rp    = acreData.census.renterPct;
+      const _r1ipct  = acreData.census.incomePercentileRank;
+      const _r1edpct = acreData.census.educationPercentile;
+      const _r1pvpct = acreData.census.povertyRatePercentile;
+      const _r1ropct = acreData.census.renterOccupiedPercentile;
+      const _r3      = acreData.census.ring3;
+      const _r5      = acreData.census.ring5;
       const c = acreData.census;
       acreData.census = {
         demographics: {
@@ -1078,12 +1138,23 @@ app.post("/api/generate", async (req, res) => {
           mf_share:                  { value: c.mfSharePct ?? null, national_percentile: c.mfSharePercentile ?? null }
         },
         economics: {
-          poverty_rate:            { value: c.povertyRate ?? null, national_percentile: c.povertyRatePercentile ?? null }
+          poverty_rate:              { value: c.povertyRate ?? null, national_percentile: c.povertyRatePercentile ?? null }
         },
         housing: {
-          pct_renter_occupied:     { value: c.renterOccupiedPct ?? c.renterPct ?? null, national_percentile: c.renterOccupiedPercentile ?? null }
+          pct_renter_occupied:       { value: c.renterOccupiedPct ?? c.renterPct ?? null, national_percentile: c.renterOccupiedPercentile ?? null }
         }
       };
+      // Restore flat ring keys for renderer (index.html lines 1646–1673)
+      acreData.census.population               = _r1pop;
+      acreData.census.medianIncome             = _r1hhi;
+      acreData.census.households               = _r1hh;
+      acreData.census.renterPct                = _r1rp;
+      acreData.census.incomePercentileRank     = _r1ipct;
+      acreData.census.educationPercentile      = _r1edpct;
+      acreData.census.povertyRatePercentile    = _r1pvpct;
+      acreData.census.renterOccupiedPercentile = _r1ropct;
+      if (_r3) acreData.census.ring3 = _r3;
+      if (_r5) acreData.census.ring5 = _r5;
     }
     if (acreData.employment && !acreData.employment.qcew) {
       const e = acreData.employment;

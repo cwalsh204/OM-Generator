@@ -437,7 +437,7 @@
   .p2-section-title { font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:700; color:var(--om-navy); }
   .p2-section-sub { font-size:10px; color:var(--om-gray); letter-spacing:1px; text-transform:uppercase; }
   .p2-section-source { margin-left:auto; font-size:8.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--om-gray); font-weight:500; }
-  .p2-chart { background:#fafbfc; border:1px solid var(--om-border); border-radius:3px; }
+  .p2-chart { background:#fafbfc; border:1px solid var(--om-border); border-radius:3px; max-width:730px; }
   .p2-chart svg { display:block; width:100%; height:100%; }
   .p2-emp-grid { display:grid; grid-template-columns:1fr 360px; gap:18px; align-items:stretch; flex:1; min-height:0; }
   .p2-sectors { display:flex; flex-direction:column; gap:0; background:#fafbfc; border:1px solid var(--om-border); border-radius:3px; padding:10px 14px; }
@@ -1642,39 +1642,47 @@ function renderOM() {
     ${secHeader('06','Location Overview','Trade Area & Drive-Time Access')}
     <div class="om-sec-body" style="padding:0;">
     ${(()=>{
-      // ── 1-Mile Ring: real A.CRE census data ──
+      // ── Census ring cards — all three sourced from Node-mapped /census/analyze-radius calls ──
       const _c1 = a.census || {};
-      const _pop1    = Number(_c1.population || 0);
-      const _hhi1    = Number(_c1.medianIncome || 0);
-      const _hh1     = Number(_c1.households || 0);
-      const _rent1   = Number(_c1.renterPct || 0);
+      const _c3 = _c1.ring3 ?? null;   // null stays null — no || {} fallback
+      const _c5 = _c1.ring5 ?? null;
+      const _r1ok = _c1.population != null;
+      const _r3ok = _c3 != null && _c3.pop != null;
+      const _r5ok = _c5 != null && _c5.pop != null;
       const _college = parseFloat(_c1.educationRate) || 0;
       const _pctile  = _c1.incomePercentileRank;
-
-      // ── 3-Mile & 5-Mile Rings: A.CRE multi-radius data ──
-      const _c3 = _c1.ring3 || {};
-      const _c5 = _c1.ring5 || {};
       const _ringData = [
-        { cls:'r1', label:'1-Mile Ring',  badge:'Primary',
-          pop:        _pop1 || 24800,
-          households: _hh1  || (_pop1 ? Math.round(_pop1/2.1) : 11900),
-          hhi:        _hhi1 || 192000,
-          renterPct:  _rent1 || 38.4 },
-        { cls:'r3', label:'3-Mile Ring',  badge:'Secondary',
-          pop:        Number(_c3.pop)        || 142300,
-          households: Number(_c3.households) || 61800,
-          hhi:        Number(_c3.medianIncome) || 165000,
-          renterPct:  Number(_c3.renterPct)  || 41.2 },
-        { cls:'r5', label:'5-Mile Ring',  badge:'Tertiary',
-          pop:        Number(_c5.pop)        || 348900,
-          households: Number(_c5.households) || 152200,
-          hhi:        Number(_c5.medianIncome) || 138000,
-          renterPct:  Number(_c5.renterPct)  || 43.6 }
+        { cls:'r1', label:'1-Mile Ring',  badge:'Primary',   ok:_r1ok,
+          pop:        _c1.population    ?? null,
+          households: _c1.households    ?? null,
+          hhi:        _c1.medianIncome  ?? null,
+          renterPct:  _c1.renterPct     ?? null },
+        { cls:'r3', label:'3-Mile Ring',  badge:'Secondary', ok:_r3ok,
+          pop:        _c3?.pop          ?? null,
+          households: _c3?.households   ?? null,
+          hhi:        _c3?.medianIncome ?? null,
+          renterPct:  _c3?.renterPct    ?? null },
+        { cls:'r5', label:'5-Mile Ring',  badge:'Tertiary',  ok:_r5ok,
+          pop:        _c5?.pop          ?? null,
+          households: _c5?.households   ?? null,
+          hhi:        _c5?.medianIncome ?? null,
+          renterPct:  _c5?.renterPct    ?? null }
       ];
-      const _fmtPop = n => n >= 1000 ? Number(n).toLocaleString() : String(n);
-      const _fmtHHI = n => n >= 1000 ? '$' + Math.round(n/1000) + 'K' : '$' + n;
-      const _fmtPct = n => (Number(n) || 0).toFixed(1) + '%';
-      const _ringsHTML = _ringData.map(r => `
+      const _fmtPop = n => n != null ? (n >= 1000 ? Number(n).toLocaleString() : String(n)) : '—';
+      const _fmtHHI = n => n != null ? (n >= 1000 ? '$' + Math.round(n/1000) + 'K' : '$' + n) : '—';
+      const _fmtPct = n => n != null ? Number(n).toFixed(1) + '%' : '—';
+      const _ringsHTML = _ringData.map(r => {
+        if (!r.ok) return `
+        <div class="loc-ring-row ${r.cls}">
+          <div class="loc-ring-header">
+            <div class="loc-ring-label">${r.label}</div>
+            <div class="loc-ring-radius">${r.badge}</div>
+          </div>
+          <div class="loc-ring-stats" style="justify-content:center;align-items:center;height:40px;opacity:0.4;font-size:11px;font-style:italic;color:#6b7280;">
+            Data unavailable
+          </div>
+        </div>`;
+        return `
         <div class="loc-ring-row ${r.cls}">
           <div class="loc-ring-header">
             <div class="loc-ring-label">${r.label}</div>
@@ -1686,7 +1694,8 @@ function renderOM() {
             <div><div class="loc-ring-stat-label">Median HHI</div><div class="loc-ring-stat-val">${_fmtHHI(r.hhi)}</div></div>
             <div><div class="loc-ring-stat-label">% Renters</div><div class="loc-ring-stat-val">${_fmtPct(r.renterPct)}</div></div>
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
       const _calloutHTML = (_college && _pctile)
         ? `<strong>${_college.toFixed(0)}%</strong> of residents within 1 mile hold a bachelor's degree or higher — income at the <strong>${_pctile}th</strong> national percentile.`
         : `Affluent, well-educated demographic profile across the trade area drives stable rental demand.`;
@@ -1700,11 +1709,12 @@ function renderOM() {
         if (/johns hopkins/i.test(raw)) return 'Johns Hopkins';
         if (/amazon/i.test(raw)) return 'Amazon';
         if (/whole foods/i.test(raw)) return 'Whole Foods';
-        if (raw.length <= 18) return raw;
+        if (/international airport/i.test(raw)) { const m = raw.match(/^(\S+)\s+International/i); return m ? m[1]+' Intl Airport' : raw.slice(0,24); }
+        if (raw.length <= 24) return raw;
         const words = raw.split(' ');
         let out = '';
-        for (const w of words) { if ((out ? out+' '+w : w).length > 18) break; out = out ? out+' '+w : w; }
-        return out || raw.slice(0, 18);
+        for (const w of words) { if ((out ? out+' '+w : w).length > 24) break; out = out ? out+' '+w : w; }
+        return out || raw.slice(0, 24);
       };
       // Build combined destinations from all structured location arrays.
       // Ring assignment: retail→5min (gold/daily errands), employers+transit→10min (navy/workforce), education→15min (blue/regional)
