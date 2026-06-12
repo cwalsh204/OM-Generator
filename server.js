@@ -520,7 +520,8 @@ async function geocodeMapDots(address, city, state, destinations) {
 
     const dots = results.filter(Boolean);
     console.log(`Geocoded ${dots.length}/${destinations.length} map destinations`);
-    console.log('MAP DOTS:', JSON.stringify(dots.map(d => ({ name: d.name, angleDeg: d.angleDeg, distanceMiles: d.distanceMiles }))));
+    console.log('MAP DOTS (geoMap keys):', JSON.stringify(dots.map(d => d.name)));
+    console.log('MAP DOTS (full):', JSON.stringify(dots.map(d => ({ name: d.name, angleDeg: d.angleDeg, distanceMiles: d.distanceMiles }))));
     return { dots };
   } catch(e) {
     console.warn('geocodeMapDots failed:', e.message); return null;
@@ -1243,10 +1244,11 @@ app.post("/api/generate", async (req, res) => {
     ].filter(d => d.name);
 
     const _mapCacheKey = `mapDots:${(inputs.address||'').toLowerCase().trim()}|${(inputs.city||'').toLowerCase().trim()}|${(inputs.state||'').toLowerCase().trim()}`;
-    let _mapDots = null;
-    try {
-      if (redis) { _mapDots = await redis.get(_mapCacheKey); if (_mapDots) console.log('Map dots: Redis cache hit'); }
-    } catch(e) { console.warn('Map dots cache read failed:', e.message); }
+    let _mapDots = null; // TEMP: cache read bypassed for dot-position diagnostic — restore after run
+    // try {
+    //   if (redis) { _mapDots = await redis.get(_mapCacheKey); if (_mapDots) console.log('Map dots: Redis cache hit'); }
+    // } catch(e) { console.warn('Map dots cache read failed:', e.message); }
+    console.log('Map dots: cache bypassed — forcing recompute for diagnostic');
 
     if (!_mapDots && _mapDestinations.length > 0) {
       _mapDots = await geocodeMapDots(inputs.address, inputs.city, inputs.state, _mapDestinations);
@@ -1351,8 +1353,10 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
           const rowNorm = json[i].map(_normH);
           const hasRent = rowNorm.some(c => /leased|market|rent|effective|contract/.test(c));
           const hasUnit = rowNorm.some(c => /\bunit\b|floorplan|floor\s*plan|\btype\b|\bbed\b/.test(c));
+          console.log(`  RR row[${i}] hasRent=${hasRent} hasUnit=${hasUnit} | ${JSON.stringify(rowNorm.filter(Boolean).slice(0,6))}`);
           if (hasRent && hasUnit) { headerRow = i; break; }
         }
+        console.log(`RR header-row selected: ${headerRow} | raw[0..5]=${JSON.stringify((json[headerRow]||[]).slice(0,6).map(h=>String(h||'').trim()))}`);
       } else {
         for (let i = 0; i < Math.min(15, json.length); i++) {
           const nonEmpty = json[i].filter(c => c && String(c).trim());
