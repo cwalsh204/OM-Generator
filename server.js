@@ -1458,19 +1458,33 @@ Summary: up to 8 key financial figures with formatted values.`
       const normHeaders = headers.map(normH);
       console.log(`Rent roll normalized headers: ${JSON.stringify(normHeaders)}`);
 
-      // Step 2: market exclusion guard — these headers are NEVER in-place
+      // Step 2: exclusion guards
       const isMarket = h => /market|asking|pro.?forma|potential|street/.test(h);
+      const isPerSF  = h => /\/sqft|\/sf\b|per.?sf|amt.*sq/i.test(h);
 
-      // Step 3: in-place column — priority order, first match wins, market-excluded
-      const inPlacePatterns = [/in.?place/, /\bleased\b/, /\bactual\b/, /\beffective\b/, /\bcontract\b/, /current\s*rent/];
-      let inPlaceIdx = -1;
-      for (const pat of inPlacePatterns) {
-        const idx = normHeaders.findIndex(h => pat.test(h) && !isMarket(h));
-        if (idx >= 0) { inPlaceIdx = idx; break; }
+      // Step 3: in-place column — prefer Sonnet-identified header; fall back to pattern matching
+      const _findColByHeader = mappedHeader => {
+        if (!mappedHeader) return -1;
+        const normMapped = normH(mappedHeader);
+        return normHeaders.findIndex(h => h === normMapped);
+      };
+      let inPlaceIdx = _findColByHeader(parsed.mappings?.inPlaceRent);
+      if (inPlaceIdx < 0) {
+        // Fallback: pattern scan with per-SF exclusion so $/sqft cols don't shadow $/unit cols
+        const inPlacePatterns = [/in.?place/, /\bleased\b/, /\bactual\b/, /\beffective\b/, /\bcontract\b/, /current\s*rent/];
+        for (const pat of inPlacePatterns) {
+          const idx = normHeaders.findIndex(h => pat.test(h) && !isMarket(h) && !isPerSF(h));
+          if (idx >= 0) { inPlaceIdx = idx; break; }
+        }
       }
 
-      // Step 4: market column
-      const marketIdx = normHeaders.findIndex(h => /market|asking|pro.?forma|potential/.test(h));
+      // Step 4: market column — prefer Sonnet-identified header; fall back to pattern matching
+      let marketIdx = _findColByHeader(parsed.mappings?.marketRent);
+      if (marketIdx < 0) marketIdx = normHeaders.findIndex(h => /market|asking|pro.?forma|potential/.test(h) && !isPerSF(h));
+
+      // Step 4b: per-SF columns (separate from dollar columns)
+      const perSFIdx    = normHeaders.findIndex(h => isPerSF(h) && !isMarket(h));
+      const mktPerSFIdx = normHeaders.findIndex(h => isPerSF(h) && isMarket(h));
 
       console.log(`Rent roll cols: in-place=${inPlaceIdx} ("${headers[inPlaceIdx]||'none'}"), market=${marketIdx} ("${headers[marketIdx]||'none'}")`);
 
@@ -1513,7 +1527,12 @@ Summary: up to 8 key financial figures with formatted values.`
         marketVal = parseVal(totalsRow[marketIdx]);
       }
 
-      // Step 8: write to canonical keys — never overwrite with market value
+      // Step 7b: per-SF values from totals row
+      const parsePerSF = raw => { const n = parseFloat(String(raw||'').replace(/[$,\s]/g,'')); return (!isNaN(n) && n > 0 && n < 100) ? n : null; };
+      const perSFVal    = (perSFIdx    >= 0 && totalsRow) ? parsePerSF(totalsRow[perSFIdx])    : null;
+      const mktPerSFVal = (mktPerSFIdx >= 0 && totalsRow) ? parsePerSF(totalsRow[mktPerSFIdx]) : null;
+
+      // Step 8: write to canonical keys — dollar amounts take priority; per-SF written separately
       parsed.summary = parsed.summary || {};
       if (inPlaceVal != null) {
         parsed.summary['Average In-Place Rent'] = `$${Math.round(inPlaceVal).toLocaleString('en-US')}`;
@@ -1523,6 +1542,8 @@ Summary: up to 8 key financial figures with formatted values.`
         parsed.summary['Market Rent'] = `$${Math.round(marketVal).toLocaleString('en-US')}`;
         console.log(`Rent roll: market = $${Math.round(marketVal)} (col ${marketIdx}, "${headers[marketIdx]}")`);
       }
+      if (perSFVal    != null) parsed.summary['Avg In-Place Rent/SF'] = `$${perSFVal.toFixed(2)}`;
+      if (mktPerSFVal != null) parsed.summary['Avg Market Rent/SF']   = `$${mktPerSFVal.toFixed(2)}`;
     }
 
     res.json({ success: true, mappings: parsed.mappings || {}, summary: parsed.summary || {}, rawRows });

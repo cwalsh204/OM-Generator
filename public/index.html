@@ -883,7 +883,7 @@ function s3(){
         </div>
         ${file?`<div style="color:${hasData?"var(--success)":"var(--warn)"};font-size:18px;">${hasData?"✓":"⚠"}</div>`:`<div style="font-size:12px;color:var(--text-3);">Click to upload</div>`}
       </div>
-      ${hasData?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">${Object.entries(pd.mappings).slice(0,6).map(([k,v])=>`<span class="tag success">${esc(k)} → ${esc(v)}</span>`).join("")}</div>`:""}
+      ${hasData?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">${(()=>{const m=pd.mappings;const pinned=['inPlaceRent','marketRent'].filter(k=>m[k]);const rest=Object.keys(m).filter(k=>!pinned.includes(k));return [...pinned,...rest].slice(0,8).map(k=>`<span class="tag success">${esc(k)} → ${esc(m[k])}</span>`).join('');})()}</div>`:""}
       ${hasError&&!hasData?`<div style="margin-top:8px;font-size:11px;color:#e8d09a;">⚠ ${esc(pd.summary.note)}</div>`:""}
     </div>`;
   };
