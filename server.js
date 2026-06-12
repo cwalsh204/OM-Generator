@@ -150,134 +150,126 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
     await mcp.connect(transport);
     console.log('A.CRE MCP SDK connected');
 
-    // ── List tools and convert to Anthropic format ──
-    const { tools: mcpTools } = await mcp.listTools();
-    console.log(`A.CRE tools available: ${mcpTools.map(t => t.name).join(', ')}`);
+    // ── Helper: extract text from MCP tool result ──
+    const extractText = r => Array.isArray(r?.content)
+      ? r.content.map(c => c.text || JSON.stringify(c)).join('\n')
+      : JSON.stringify(r);
 
-    const anthropicTools = mcpTools.map(t => ({
-      name:         t.name,
-      description:  t.description,
-      input_schema: t.inputSchema
-    }));
+    // ── Stage 1: Hardcoded parallel fetches — no LLM path selection ──
+    const fullAddress = `${address}, ${city}, ${state}${zip ? ' ' + zip : ''}`;
+    console.log(`Fetching 5 A.CRE data sources in parallel for: ${fullAddress}`);
 
-    // ── Initial prompt: tell Claude which tools to call and what JSON to return ──
-    const systemPrompt = `You are a data retrieval agent. Call the A.CRE tools to fetch data for the given property, then return a JSON summary. You MUST call ALL tools simultaneously in a single response — return all tool_use blocks at once without waiting for any results first.`;
+    const [ratesRaw, censusRaw, employmentRaw, permitsRaw, econRaw] = await Promise.all([
+      mcp.callTool({ name: 'query_data', arguments: { source: 'rates',               path: '/v1/analyze',     method: 'POST', body: { include_curve: true } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'census',              path: '/census/analyze', method: 'POST', body: { address: fullAddress } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'employment',          path: '/api/v1/analyze', method: 'POST', body: { address: fullAddress } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'residential-permits', path: '/api/v1/analyze', method: 'POST', body: { address: fullAddress, include_history_months: 84 } } }),
+      mcp.callTool({ name: 'query_data', arguments: { source: 'economic-indicators', path: '/api/v1/analyze', method: 'POST', body: { categories: ['general_inflation','credit_cycle','consumer','recession_signals'] } } }),
+    ]);
+    console.log('A.CRE parallel fetches complete');
 
-    const userPrompt = `Fetch A.CRE Intelligence Hub data for: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}${county ? ` (County: ${county}` : ''}${msa ? `, MSA: ${msa}` : ''}${county || msa ? ')' : ''}.
+    // ── Stage 2: Node mappings — deterministic, no LLM arithmetic ──
+    let nodeRates = { treasury_10y: null, treasury_5y: null, sofr: null, rateSheet: null };
+    let nodeEmpCAGR5y = null;
+    let nodeDRTSCILM = null, nodeDRTSCILMTrend = null, nodeUMCSENT = null;
+    let nodePermits = null;
 
-Call ALL of the following tools simultaneously in one response (do not call them one at a time):
-- Rates — Treasury yields, SOFR, Freddie Mac agency rates
-- Census/demographics — for address: ${address}, ${city}, ${state}${zip ? ` ${zip}` : ''}; include: poverty rate and its national percentile (povertyRate, povertyRatePercentile); % renter-occupied housing and its national percentile (renterOccupiedPct, renterOccupiedPercentile)
-- Employment — QCEW data for this area${zip ? `; also include ZIP-code-level employment data for ZIP ${zip} if available (unemployment rate, job mix, growth trend)` : ''}; include 10-year employment CAGR (empCAGR10y); for each top sector include establishment share % (share) and location quotient / concentration ratio vs MSA avg (ratio)
-- Residential permits — for this county/MSA; include monthly historical permit data (include_history_months: 84) so annual totals can be computed
-- Economic indicators — FRED macro data, recession signals, CPI (headline + core + shelter), construction cost YoY, CRE lending YoY; include FRED series DRTSCILM (% banks tightening CRE loan standards): latest value, its 5-year percentile (drtscilmPctile5yr), and trend direction — "tightening", "loosening", or "neutral" (drtscilmTrend)
-- Rate sheet — Freddie Mac agency rate sheet: term × LTV grid with indicative rates, spreads, sample loan counts, confidence levels
+    try {
+      const rD = JSON.parse(extractText(ratesRaw));
+      nodeRates = {
+        treasury_10y: rD?.data?.treasury_yields?.yields?.['10Y']?.rate ?? null,
+        treasury_5y:  rD?.data?.treasury_yields?.yields?.['5Y']?.rate  ?? null,
+        sofr:         rD?.data?.market_rates?.rates?.sofr_daily?.rate  ?? null,
+        rateSheet:    rD?.data?.cre_loan_pricing?.agency_mf?.buckets   ?? null
+      };
+    } catch (e) { console.warn('Rates parse failed:', e.message); }
 
-After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
+    try {
+      const eD = JSON.parse(extractText(employmentRaw));
+      nodeEmpCAGR5y = eD?.data?.county?.long_range_trends?.employment?.cagr_5y ?? null;
+    } catch (e) { console.warn('Employment CAGR parse failed:', e.message); }
+
+    try {
+      const ecD = JSON.parse(extractText(econRaw));
+      nodeDRTSCILM      = ecD?.data?.series?.DRTSCILM?.latest?.value           ?? null;
+      nodeDRTSCILMTrend = ecD?.data?.series?.DRTSCILM?.latest?.trend_direction ?? null;
+      nodeUMCSENT       = ecD?.data?.series?.UMCSENT?.latest?.value            ?? null;
+    } catch (e) { console.warn('Econ indicators parse failed:', e.message); }
+
+    // ── Permits: compute in Node from raw response ──
+    try {
+      const raw  = JSON.parse(extractText(permitsRaw));
+      const msaP = raw?.data?.msa;
+      const hist = raw?.data?.historical?.msa;
+      const byYear = (hist || []).reduce((acc, m) => {
+        const yr = Number((m.date || '').slice(0, 4));
+        if (yr) acc[yr] = (acc[yr] || 0) + (m.units_5_plus || 0);
+        return acc;
+      }, {});
+      if (msaP) {
+        const currentYear = new Date().getFullYear();
+        nodePermits = {
+          supply_pressure_index: {
+            current_score: msaP.supply_pressure?.multifamily?.score ?? null,
+            national_percentile: msaP.supply_pressure?.multifamily?.pctile_national ?? null
+          },
+          trailing_12_months: { total_units: msaP.trailing_12m?.units_5_plus ?? null },
+          [`ytd_${currentYear}`]: byYear[currentYear] || null,
+          permit_trend: {
+            annual_data: [
+              ...Object.entries(byYear)
+                .filter(([y]) => Number(y) !== currentYear)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .slice(-5)
+                .map(([year, units]) => ({ year: Number(year), units })),
+              ...(byYear[currentYear]
+                ? [{ year: `${currentYear} YTD`, units: byYear[currentYear] }]
+                : [])
+            ]
+          }
+        };
+        console.log(`Node permits: SPI=${nodePermits.supply_pressure_index.current_score}, YTD=${nodePermits[`ytd_${currentYear}`]}, years=${nodePermits.permit_trend.annual_data.length}`);
+      }
+    } catch (e) { console.warn('Permits parse failed:', e.message); }
+
+    // ── Diagnostic ──
+    console.log('EXTRACT CHECK:', extractText(ratesRaw).slice(0, 200));
+    console.log('NODE VALUES:', JSON.stringify({ nodeRates, nodeEmpCAGR5y, nodeDRTSCILM, nodeUMCSENT }));
+
+    // ── Stage 3: Haiku text-mode synthesis — reads raw results, returns remaining schema fields ──
+    // No tools, no loop. Haiku maps census/employment/econ prose from the raw context provided.
+    const synthesisContext = `Raw A.CRE API results for ${fullAddress}:
+
+RATES:
+${extractText(ratesRaw).slice(0, 4000)}
+
+CENSUS:
+${extractText(censusRaw).slice(0, 8000)}
+
+EMPLOYMENT:
+${extractText(employmentRaw).slice(0, 8000)}
+
+PERMITS: [computed in Node — omitted]
+
+ECONOMIC INDICATORS:
+${extractText(econRaw).slice(0, 6000)}
+
+Return ONLY a JSON object — no preamble, no markdown:
 {
-  "rates": { "treasury_10y": number, "treasury_5y": number, "sofr": number, "freddieMFRate": number, "agencySpread": number, "termLTVBucket": string, "rateSheetSummary": string },
   "census": { "medianIncome": number, "population": number, "educationRate": number, "educationPercentile": number, "medianAge": number, "households": number, "populationGrowth": number, "populationGrowthPercentile": number, "incomePercentileRank": number, "renterPct": number, "povertyRate": number|null, "povertyRatePercentile": number|null, "renterOccupiedPct": number|null, "renterOccupiedPercentile": number|null, "ring3": { "pop": number, "households": number, "medianIncome": number, "renterPct": number }, "ring5": { "pop": number, "households": number, "medianIncome": number, "renterPct": number } },
-  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR5y": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
-  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "consumerConfidence": number, "consumerConfidencePercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number, "drtscilmValue": number|null, "drtscilmPctile5yr": number|null, "drtscilmTrend": string|null },
+  "employment": { "totalJobs": number, "yoyGrowth": number, "yoyGrowthPercentile": number, "avgWage": number, "avgWagePercentile": number, "topSectors": [{ "name": string, "employees": number, "share": number, "ratio": number }], "multifamilyDemandIndex": number, "zipUnemploymentRate": number|null, "msaUnemploymentRate": number|null, "momentumScore": number|null, "resilienceIndex": number|null, "empCAGR10y": number|null, "covidRecoveryMonths": number|null, "trendDirection": string|null },
+  "economicIndicators": { "macroEnvironment": string, "macroHeadline": string, "macroNarrative": string, "recessionSignalsTriggered": number, "creditConditionsLabel": string, "creditConditionsPercentile": number, "coreInflation": number, "coreInflationPercentile": number, "cpiYoY": number, "shelterInflation": number, "constructionCostYoY": number, "creLendingYoY": number },
   "rateSheet": { "rateSheetNarrative": string, "termLTVNarrative": string, "rows": [{ "term": string, "ltvBucket": string, "rateRangeLow": number, "rateRangeHigh": number, "spreadBps": number, "sampleLoans": number, "confidence": "high|medium|low" }] }
 }`;
 
-    const messages = [{ role: 'user', content: userPrompt }];
+    const synthResponse = await anthropic.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 8000,
+      system:     'You are a data extraction agent. Read the provided raw API results and populate a JSON object with numbers exactly as they appear — do not estimate or fabricate values.',
+      messages:   [{ role: 'user', content: synthesisContext }]
+    });
 
-    // ── Tool-use loop: run until Claude stops calling tools ──
-    let finalText = '';
-    let iterations = 0;
-    const maxIterations = 10;
-    let nodePermits = null; // computed in Node from raw ACRE response — bypasses Haiku
-
-    while (iterations < maxIterations) {
-      iterations++;
-      const response = await anthropic.messages.create({
-        model:      'claude-haiku-4-5-20251001',
-        max_tokens: 8000,
-        system:     systemPrompt,
-        tools:      anthropicTools,
-        messages
-      });
-
-      console.log(`A.CRE tool loop iteration ${iterations}: stop_reason=${response.stop_reason}`);
-
-      // Collect any text from this turn
-      const textContent = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
-      if (textContent) finalText = textContent;
-
-      if (response.stop_reason !== 'tool_use') break;
-
-      // ── Execute each tool_use block via MCP SDK ──
-      const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
-      const toolResults = [];
-
-      for (const block of toolUseBlocks) {
-        if (block.name.toLowerCase().includes('residential') || block.name.toLowerCase().includes('permit')) {
-          block.input = { ...block.input, include_history_months: 84 };
-        }
-        console.log(`Calling A.CRE tool: ${block.name}`, JSON.stringify(block.input));
-        try {
-          const result = await mcp.callTool({ name: block.name, arguments: block.input });
-          const resultText = Array.isArray(result.content)
-            ? result.content.map(c => c.text || JSON.stringify(c)).join('\n')
-            : JSON.stringify(result);
-
-          // ── Compute permits deterministically in Node — no LLM arithmetic ──
-          if (JSON.stringify(block.input).includes('residential-permits')) {
-            try {
-              const raw  = JSON.parse(resultText);
-              const msa  = raw?.data?.msa;
-              const hist = raw?.data?.historical?.msa;
-              const byYear = (hist || []).reduce((acc, m) => {
-                const yr = Number((m.date || '').slice(0, 4));
-                if (yr) acc[yr] = (acc[yr] || 0) + (m.units_5_plus || 0);
-                return acc;
-              }, {});
-              if (msa) {
-                const currentYear = new Date().getFullYear();
-                nodePermits = {
-                  supply_pressure_index: {
-                    current_score: msa.supply_pressure?.multifamily?.score ?? null,
-                    national_percentile: msa.supply_pressure?.multifamily?.pctile_national ?? null
-                  },
-                  trailing_12_months: { total_units: msa.trailing_12m?.units_5_plus ?? null },
-                  [`ytd_${currentYear}`]: byYear[currentYear] || null,
-                  permit_trend: {
-                    annual_data: [
-                      ...Object.entries(byYear)
-                        .filter(([y]) => Number(y) !== currentYear)
-                        .sort(([a], [b]) => Number(a) - Number(b))
-                        .slice(-5)
-                        .map(([year, units]) => ({ year: Number(year), units })),
-                      ...(byYear[currentYear]
-                        ? [{ year: `${currentYear} YTD`, units: byYear[currentYear] }]
-                        : [])
-                    ]
-                  }
-                };
-                console.log(`Node permits computed: SPI=${nodePermits.supply_pressure_index.current_score}, YTD=${nodePermits[`ytd_${currentYear}`]}, years=${nodePermits.permit_trend.annual_data.length}`);
-              }
-            } catch (e) {
-              console.warn('Node permits parse failed:', e.message);
-            }
-          }
-
-          // Stub the full permits payload so the 84-month array doesn't bloat Haiku's synthesis input
-          const resultForHaiku = JSON.stringify(block.input).includes('residential-permits')
-            ? JSON.stringify({ note: "permits computed in Node — full array omitted from synthesis context" })
-            : resultText;
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultForHaiku });
-        } catch (toolErr) {
-          console.warn(`Tool ${block.name} failed:`, toolErr.message);
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: `Error: ${toolErr.message}`, is_error: true });
-        }
-      }
-
-      // Append assistant turn + tool results to messages and loop
-      messages.push({ role: 'assistant', content: response.content });
-      messages.push({ role: 'user',      content: toolResults });
-    }
+    const finalText = synthResponse.content.filter(b => b.type === 'text').map(b => b.text).join('');
 
     // ── Extract JSON from final text ──
     const jsonMatch = finalText.match(/\{[\s\S]*\}/);
@@ -293,7 +285,20 @@ After ALL tool calls, return ONLY a JSON object — no preamble, no markdown:
       return null;
     }
     console.log('PARSED KEYS:', Object.keys(data), '| finalText length:', finalText.length);
-    if (nodePermits) data.permits = nodePermits;
+
+    // ── Stage 4: Inject all Node-mapped values ──
+    data.rates   = nodeRates;
+    data.permits = nodePermits;
+    if (data.employment) data.employment.empCAGR5y = nodeEmpCAGR5y;
+    if (data.economicIndicators) {
+      data.economicIndicators.drtscilmValue     = nodeDRTSCILM;
+      data.economicIndicators.drtscilmTrend     = nodeDRTSCILMTrend
+        ? (nodeDRTSCILMTrend.toLowerCase().includes('tighten') ? 'tightening'
+          : nodeDRTSCILMTrend.toLowerCase().includes('loosen') ? 'loosening' : 'neutral')
+        : null;
+      data.economicIndicators.consumerConfidence = nodeUMCSENT;
+    }
+
     if (data) {
       console.log('A.CRE data fetched successfully via MCP SDK');
       console.log('Macro environment:', data.economicIndicators?.macroEnvironment);
