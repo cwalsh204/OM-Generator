@@ -1499,12 +1499,14 @@ Summary: up to 8 key financial figures with formatted values.`
       console.log(`Rent roll cols: in-place=${inPlaceIdx} ("${headers[inPlaceIdx]||'none'}"), market=${marketIdx} ("${headers[marketIdx]||'none'}")`);
 
       // Step 5: totals/averages row (scan every cell, not just col A)
+      // Strip trailing colon before matching ("Totals / Averages:" is common)
       const totalsRow = [...allRows].reverse().find(r =>
         r.some(cell =>
           /^(total|totals|average|averages|totals\s*\/\s*averages|grand\s*total|all\s*units|overall|summary|portfolio\s*total|avg\s*all|weighted\s*avg)$/i
-            .test(String(cell||'').trim())
+            .test(String(cell||'').trim().replace(/:$/, ''))
         )
       );
+      console.log(`RR_DIAG totalsRow found: ${!!totalsRow} | first cell: "${String(totalsRow?.[0]||'').trim()}"`)
 
       const parseVal = raw => {
         const n = parseFloat(String(raw||'').replace(/[$,\s]/g,''));
@@ -1518,15 +1520,24 @@ Summary: up to 8 key financial figures with formatted values.`
           inPlaceVal = parseVal(totalsRow[inPlaceIdx]);
         }
         if (inPlaceVal == null) {
-          // No totals row — average across unit rows, skip vacant/zero-rent and summary rows
-          const isTotalsLike = r => r.some(cell => /^(total|average|summary|portfolio)/i.test(String(cell||'').trim()));
-          const vals = allRows
-            .filter(r => !isTotalsLike(r))
-            .map(r => parseVal(r[inPlaceIdx]))
-            .filter(v => v != null);
-          if (vals.length > 0) {
-            inPlaceVal = Math.round(vals.reduce((s,v) => s+v, 0) / vals.length);
-            console.log(`Rent roll: computed avg from ${vals.length} unit rows (no totals row found)`);
+          // No totals row — weighted average across unit/floorplan rows by unit count; fall back to flat mean
+          const isTotalsLike = r => r.some(cell => /^(total|average|summary|portfolio)/i.test(String(cell||'').trim().replace(/:$/,'')));
+          const unitCountIdx = _findColByHeader(parsed.mappings?.numberOfUnits);
+          const dataRows = allRows.filter(r => !isTotalsLike(r));
+          let weightedSum = 0, totalUnits = 0, flatSum = 0, flatCount = 0;
+          for (const r of dataRows) {
+            const v = parseVal(r[inPlaceIdx]);
+            if (v == null) continue;
+            const u = unitCountIdx >= 0 ? parseFloat(String(r[unitCountIdx]||'').replace(/[,\s]/g,'')) : NaN;
+            if (!isNaN(u) && u > 0) { weightedSum += v * u; totalUnits += u; }
+            flatSum += v; flatCount++;
+          }
+          if (totalUnits > 0) {
+            inPlaceVal = Math.round(weightedSum / totalUnits);
+            console.log(`Rent roll: weighted avg from ${flatCount} rows, ${totalUnits} units → $${inPlaceVal}`);
+          } else if (flatCount > 0) {
+            inPlaceVal = Math.round(flatSum / flatCount);
+            console.log(`Rent roll: flat avg from ${flatCount} unit rows (no unit-count col) → $${inPlaceVal}`);
           }
         }
       }
@@ -1555,6 +1566,9 @@ Summary: up to 8 key financial figures with formatted values.`
       }
       if (perSFVal    != null) parsed.summary['Avg In-Place Rent/SF'] = `$${perSFVal.toFixed(2)}`;
       if (mktPerSFVal != null) parsed.summary['Avg Market Rent/SF']   = `$${mktPerSFVal.toFixed(2)}`;
+      // Remove LLM-generated aliases so there is exactly ONE canonical key per value
+      ['Avg In-Place Rent','In-Place Rent','Leased Rent','Avg Leased Rent','Average Leased Rent',
+       'Avg Market Rent','Average Market Rent','Asking Rent'].forEach(k => delete parsed.summary[k]);
     }
 
     res.json({ success: true, mappings: parsed.mappings || {}, summary: parsed.summary || {}, rawRows });
