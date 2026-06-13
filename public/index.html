@@ -1770,9 +1770,8 @@ function renderOM() {
       const _distFill = mi => mi <= 1 ? '#c9a84c' : mi <= 3 ? '#1e3a5f' : '#4a90d9';
       const _hasGeo = o._mapDots && Array.isArray(o._mapDots.dots) && o._mapDots.dots.length > 0;
       const _dotsSVG = (() => {
-        const SVG_W = 700, SVG_H = 660, PAD = 14;
-        const placed = []; // track label centres for collision detection
         return _destinations.map((d, i) => {
+          const num = i + 1;
           const angle = d.angleDeg != null
             ? (d.angleDeg - 90) * Math.PI / 180
             : (i / Math.max(_destinations.length, 1)) * 2 * Math.PI - Math.PI/2;
@@ -1781,53 +1780,14 @@ function renderOM() {
           const r = Math.min(mi, MAX_MI) / MAX_MI * OUTER_PX;
           const px = _cx + r * Math.cos(angle);
           const py = _cy + r * Math.sin(angle);
-          console.log(`MAP DOT [${i}] "${d.name}" | distMi=${d.distanceMiles} angleDeg=${d.angleDeg} | r=${r.toFixed(1)} px=${px.toFixed(1)} py=${py.toFixed(1)}${beyondMax?' BEYOND_MAX':''}`);
-          const estW = (d.displayName || d.name).length * 6.2; // approximate text width
-
-          // ── Label placement: side for central dots, above/below for edge dots ──
-          let lx, ly, anchor;
-          const nearLeft  = px < 130;
-          const nearRight = px > SVG_W - 130;
-          const nearTop   = py < 80;
-
-          if (nearLeft || nearRight) {
-            // Too close to left/right edge — place label above or below the dot
-            anchor = 'middle';
-            lx = Math.max(PAD + estW / 2, Math.min(SVG_W - PAD - estW / 2, px));
-            ly = (py > _cy) ? py - 12 : py + 18; // above if lower half, below if upper
-          } else if (nearTop) {
-            anchor = 'middle';
-            lx = Math.max(PAD + estW / 2, Math.min(SVG_W - PAD - estW / 2, px));
-            ly = py + 16;
-          } else {
-            anchor = px >= _cx ? 'start' : 'end';
-            lx = px >= _cx ? px + 8 : px - 8;
-            ly = py + 4;
-          }
-
-          // ── Clamp label within SVG bounds ──
-          if (anchor === 'start')  lx = Math.min(lx, SVG_W - estW - PAD);
-          if (anchor === 'end')    lx = Math.max(lx, estW + PAD);
-          if (anchor === 'middle') lx = Math.max(PAD + estW / 2, Math.min(SVG_W - PAD - estW / 2, lx));
-          ly = Math.max(PAD + 10, Math.min(SVG_H - PAD, ly));
-
-          // ── Collision nudge: push label down if too close to a placed label ──
-          let attempts = 0;
-          while (attempts < 6) {
-            const clash = placed.some(p => Math.abs(lx - p.x) < 75 && Math.abs(ly - p.y) < 13);
-            if (!clash) break;
-            ly += 13;
-            ly = Math.min(SVG_H - PAD, ly);
-            attempts++;
-          }
-          placed.push({ x: lx, y: ly });
-
-          const _dotFill   = beyondMax ? 'none' : _distFill(mi);
-          const _dotStroke = beyondMax ? _distFill(MAX_MI) : '#fff';
-          const _dotSW     = beyondMax ? '1.5' : '1.5';
-          const _dotDash   = beyondMax ? 'stroke-dasharray="3,2"' : '';
-          return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="${_dotFill}" stroke="${_dotStroke}" stroke-width="${_dotSW}" ${_dotDash} opacity="${beyondMax ? 0.6 : 1}"/>`
-               + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="DM Sans,sans-serif" font-size="10" fill="#0a1628" text-anchor="${anchor}" opacity="${beyondMax ? 0.6 : 1}">${esc(d.displayName || d.name)}</text>`;
+          const fill   = beyondMax ? 'none'            : _distFill(mi);
+          const stroke = beyondMax ? _distFill(MAX_MI) : '#fff';
+          const dash   = beyondMax ? 'stroke-dasharray="3,2"' : '';
+          const op     = beyondMax ? 0.7 : 1;
+          const numFill = beyondMax ? stroke : '#fff';
+          // r=11 handles 2-digit "10"; font-size=9 fits cleanly; SVG <text> digit — PDF-safe
+          return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="11" fill="${fill}" stroke="${stroke}" stroke-width="1.5" ${dash} opacity="${op}"/>` +
+                 `<text x="${px.toFixed(1)}" y="${(py + 3.5).toFixed(1)}" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" font-weight="700" fill="${numFill}" opacity="${op}">${num}</text>`;
         }).join('');
       })();
 
@@ -1872,7 +1832,19 @@ function renderOM() {
         <div class="loc-iso-side">
           <div class="loc-iso-side-title">Demographic Trade Area</div>
           ${_ringsHTML}
-          <div class="loc-callout">${_calloutHTML}</div>
+          <div style="display:flex;flex-direction:column;gap:5px;overflow:hidden;margin-top:2px;">
+            <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--om-gold);font-weight:600;padding-bottom:5px;border-bottom:1px solid var(--om-border);">Destinations</div>
+            ${_destinations.map((d,i)=>{
+              const num = i + 1;
+              const fill = _distFill(d.distanceMiles); // single source of truth — matches SVG marker
+              const dist = d.distanceMiles != null ? d.distanceMiles.toFixed(1)+' mi' : '>5 mi';
+              return `<div style="display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--om-navy);line-height:1.3;">
+                <span style="width:18px;height:18px;border-radius:50%;background:${fill};display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:700;color:#fff;">${num}</span>
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.displayName||d.name)}</span>
+                <span style="font-size:9px;color:var(--om-gray);flex-shrink:0;">${dist}</span>
+              </div>`;
+            }).join('')}
+          </div>
         </div>
       </div>`;
     })()}
@@ -2232,13 +2204,17 @@ function renderOM() {
       const permitGridSVG = ticks.map((t,i)=>`
         <line x1="60" y1="${gridY[i]}" x2="930" y2="${gridY[i]}" stroke="${i===4?'#0a1628':'#e5e7eb'}" stroke-width="${i===4?1:0.5}"/>
         <text x="52" y="${gridY[i]+4}" text-anchor="end">${Number(t).toLocaleString()}</text>`).join('');
+      const _N = permitVals.length, _barW = 62;
+      const _gap = (960 - _N * _barW) / (_N + 1);
+      const _stabLineX = (_gap + 6 * (_barW + _gap)).toFixed(1);
       const permitBarsSVG = permitVals.map((v,i)=>{
-        const x=93+i*108, h=(v/permitMax)*180, y=210-h;
+        const x = _gap + i * (_barW + _gap);
+        const h=(v/permitMax)*180, y=210-h;
         const stab = hasRentStab && i>=6;
         const color = stab ? '#c0392b' : '#1e3a5f';
-        return `<rect x="${x}" y="${y}" width="62" height="${Math.max(h,2)}" fill="${color}" rx="2"/>
-          <text x="${x+31}" y="${y-6}" text-anchor="middle" font-family="DM Sans" font-size="10" fill="${color}" font-weight="${stab?700:600}">${Number(v).toLocaleString()}</text>
-          <text x="${x+31}" y="226" text-anchor="middle" font-family="DM Sans" font-size="10" fill="#6b7280">${permitYears[i]}${i===permitVals.length-1?' YTD':''}</text>`;
+        return `<rect x="${x.toFixed(1)}" y="${y}" width="62" height="${Math.max(h,2)}" fill="${color}" rx="2"/>
+          <text x="${(x+31).toFixed(1)}" y="${y-6}" text-anchor="middle" font-family="DM Sans" font-size="10" fill="${color}" font-weight="${stab?700:600}">${Number(v).toLocaleString()}</text>
+          <text x="${(x+31).toFixed(1)}" y="226" text-anchor="middle" font-family="DM Sans" font-size="10" fill="#6b7280">${permitYears[i]}${i===permitVals.length-1?' YTD':''}</text>`;
       }).join('');
 
       // Employment SVG
@@ -2270,11 +2246,11 @@ function renderOM() {
           <div class="p2-section-source">Census BPS · A.CRE <span class="acre-badge-light">Live</span></div>
         </div>
         <div class="p2-chart" style="height:175px;">
-          <svg viewBox="0 0 730 240" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+          <svg viewBox="0 0 960 240" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <g font-family="DM Sans" font-size="9" fill="#6b7280">${permitGridSVG}</g>
             ${permitBarsSVG}
-            ${hasRentStab ? `<line x1="722" y1="55" x2="722" y2="210" stroke="#c9a84c" stroke-width="1.5" stroke-dasharray="5,3"/>
-            <g transform="translate(722,55)">
+            ${hasRentStab ? `<line x1="${_stabLineX}" y1="55" x2="${_stabLineX}" y2="210" stroke="#c9a84c" stroke-width="1.5" stroke-dasharray="5,3"/>
+            <g transform="translate(${_stabLineX},55)">
               <rect x="-95" y="-11" width="190" height="20" fill="#c9a84c" rx="2"/>
               <text x="0" y="3" text-anchor="middle" font-family="DM Sans" font-size="9" font-weight="700" fill="#fff" letter-spacing="0.5">▼ ${rentStabDate.toUpperCase()} — RENT STABILIZATION</text>
             </g>` : ''}
