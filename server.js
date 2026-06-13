@@ -1486,6 +1486,11 @@ Summary: up to 8 key financial figures with formatted values.`
       const perSFIdx    = normHeaders.findIndex(h => isPerSF(h) && !isMarket(h));
       const mktPerSFIdx = normHeaders.findIndex(h => isPerSF(h) && isMarket(h));
 
+      // ── Diagnostic: side-by-side in-place vs market resolution ──
+      console.log('RR_DIAG raw mappings:', JSON.stringify({ inPlaceRent: parsed.mappings?.inPlaceRent, marketRent: parsed.mappings?.marketRent }));
+      console.log('RR_DIAG norm mappings:', JSON.stringify({ inPlaceNorm: normH(parsed.mappings?.inPlaceRent||''), marketNorm: normH(parsed.mappings?.marketRent||'') }));
+      console.log('RR_DIAG normHeaders:', JSON.stringify(normHeaders));
+      console.log('RR_DIAG resolved idx:', JSON.stringify({ inPlaceIdx, marketIdx }));
       console.log(`Rent roll cols: in-place=${inPlaceIdx} ("${headers[inPlaceIdx]||'none'}"), market=${marketIdx} ("${headers[marketIdx]||'none'}")`);
 
       // Step 5: totals/averages row (scan every cell, not just col A)
@@ -1526,6 +1531,7 @@ Summary: up to 8 key financial figures with formatted values.`
       if (marketIdx >= 0 && totalsRow) {
         marketVal = parseVal(totalsRow[marketIdx]);
       }
+      console.log('RR_DIAG totals cells:', JSON.stringify({ inPlaceCell: totalsRow?.[inPlaceIdx], marketCell: totalsRow?.[marketIdx], inPlaceVal, marketVal }));
 
       // Step 7b: per-SF values from totals row
       const parsePerSF = raw => { const n = parseFloat(String(raw||'').replace(/[$,\s]/g,'')); return (!isNaN(n) && n > 0 && n < 100) ? n : null; };
