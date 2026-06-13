@@ -281,6 +281,8 @@ async function fetchAcreData(address, city, state, county, msa, zip) {
       nodeDRTSCILMPctile = ecD?.data?.series?.DRTSCILM?.latest?.pctile_yoy_5yr  ?? null;
       nodeUMCSENT        = ecD?.data?.series?.UMCSENT?.latest?.value             ?? null;
       nodeUMCSENTPctile  = ecD?.data?.series?.UMCSENT?.latest?.pctile_yoy_5yr   ?? null;
+      console.log('Econ series keys:', Object.keys(ecD?.data?.series || {}));
+      console.log('Sample latest (DRTSCILM):', JSON.stringify(ecD?.data?.series?.DRTSCILM?.latest));
     } catch (e) { console.warn('Econ indicators parse failed:', e.message); }
 
     // ── Permits: compute in Node from raw response ──
