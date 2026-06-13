@@ -1352,8 +1352,13 @@ app.post("/api/parse-file", upload.single("file"), async (req, res) => {
           const rowNorm = json[i].map(_normH);
           const hasRent = rowNorm.some(c => /leased|market|rent|effective|contract/.test(c));
           const hasUnit = rowNorm.some(c => /\bunit\b|floorplan|floor\s*plan|\btype\b|\bbed\b/.test(c));
-          console.log(`  RR row[${i}] hasRent=${hasRent} hasUnit=${hasUnit} | ${JSON.stringify(rowNorm.filter(Boolean).slice(0,6))}`);
-          if (hasRent && hasUnit) { headerRow = i; break; }
+          // Reject metadata rows that coincidentally match: real header rows have ≥4 distinct short labels;
+          // "Parameters:..." rows have 1 long repeated sentence.
+          const distinctVals = new Set(rowNorm.filter(Boolean));
+          const maxCellLen   = Math.max(...rowNorm.filter(Boolean).map(c => c.length), 0);
+          const looksLikeHeader = distinctVals.size >= 4 && maxCellLen <= 60;
+          console.log(`  RR row[${i}] hasRent=${hasRent} hasUnit=${hasUnit} distinct=${distinctVals.size} maxLen=${maxCellLen} looksLikeHeader=${looksLikeHeader} | ${JSON.stringify(rowNorm.filter(Boolean).slice(0,6))}`);
+          if (hasRent && hasUnit && looksLikeHeader) { headerRow = i; break; }
         }
         console.log(`RR header-row selected: ${headerRow} | raw[0..5]=${JSON.stringify((json[headerRow]||[]).slice(0,6).map(h=>String(h||'').trim()))}`);
       } else {
